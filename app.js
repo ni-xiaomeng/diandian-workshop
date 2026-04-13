@@ -450,11 +450,17 @@ function drawDrawCanvas() {
 
 function syncDrawViewportSize() {
   if (!drawZoomViewport || !drawCanvas) return;
-  const cw = drawCanvas.offsetWidth || drawCanvas.clientWidth || 0;
-  const ch = drawCanvas.offsetHeight || drawCanvas.clientHeight || 0;
-  if (cw > 0 && ch > 0) {
-    drawZoomViewport.style.width = cw + "px";
-    drawZoomViewport.style.height = ch + "px";
+  const zoomed = drawZoom > 1 + 1e-3;
+  if (zoomed) {
+    drawZoomViewport.style.width = "100%";
+    drawZoomViewport.style.height = "100%";
+  } else {
+    const cw = drawCanvas.offsetWidth || drawCanvas.clientWidth || 0;
+    const ch = drawCanvas.offsetHeight || drawCanvas.clientHeight || 0;
+    if (cw > 0 && ch > 0) {
+      drawZoomViewport.style.width = cw + "px";
+      drawZoomViewport.style.height = ch + "px";
+    }
   }
 }
 

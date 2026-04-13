@@ -63,6 +63,7 @@ const drawZoomOutBtn = document.getElementById("drawZoomOut");
 const drawZoomResetBtn = document.getElementById("drawZoomReset");
 const drawZoomLabel = document.getElementById("drawZoomLabel");
 const drawPanBtn = document.getElementById("drawPanBtn");
+const selectBtn = document.getElementById("selectBtn");
 const undoDrawBtn = document.getElementById("undoDrawBtn");
 const redoDrawBtn = document.getElementById("redoDrawBtn");
 const drawColorFloat = document.getElementById("drawColorFloat");
@@ -163,11 +164,14 @@ const PIXEL_GLYPH = {
 };
 
 let shapeDrag = null;
-/** 方形/圆形拖拽时是否按住 Shift（正形约束）；由 pointer 与 Shift 键事件同步 */
 let shapeDragShiftKey = false;
 let eyedropperKeyHoldDepth = 0;
 let eyedropperPrevMode = "pen";
 let eyedropperFromHold = false;
+
+let drawObjects = [];
+let selectedObjIdx = -1;
+let objDragState = null;
 
 function pickerHueSlot() {
   return Math.round((((pickerHue % 360) + 360) % 360) * 100);
@@ -434,6 +438,9 @@ function drawPixelMatrix(ctx, canvas, pixels, cols, rows, pixelSize, showGrid) {
 function drawDrawCanvas() {
   drawPixelSize = autoPixelSize(drawCanvas, drawGridCols, drawGridRows);
   drawPixelMatrix(drawCtx, drawCanvas, drawPixels, drawGridCols, drawGridRows, drawPixelSize, true);
+  if (drawObjects.length > 0) {
+    renderObjects(drawCtx);
+  }
   if (shapeDrag) {
     drawShapePreview(drawCtx);
   }
@@ -1076,11 +1083,22 @@ function cloneDrawPixelsData() {
   return drawPixels.map((row) => row.slice());
 }
 
+function cloneDrawObjects() {
+  return drawObjects.map(o => ({
+    type: o.type,
+    relPixels: o.relPixels.map(p => p.slice()),
+    ox: o.ox, oy: o.oy,
+    rotation: o.rotation,
+    boundW: o.boundW, boundH: o.boundH,
+  }));
+}
+
 function pushDrawUndo() {
   drawUndoStack.push({
     pixels: cloneDrawPixelsData(),
     cols: drawGridCols,
     rows: drawGridRows,
+    objects: cloneDrawObjects(),
   });
   while (drawUndoStack.length > DRAW_UNDO_MAX) {
     drawUndoStack.shift();
@@ -1095,9 +1113,13 @@ function undoDraw() {
     pixels: cloneDrawPixelsData(),
     cols: drawGridCols,
     rows: drawGridRows,
+    objects: cloneDrawObjects(),
   });
   const entry = drawUndoStack.pop();
   drawPixels = entry.pixels.map((row) => row.slice());
+  drawObjects = entry.objects ? entry.objects.map(o => ({ ...o, relPixels: o.relPixels.map(p => p.slice()) })) : [];
+  selectedObjIdx = -1;
+  objDragState = null;
   const dimsChanged = entry.cols !== drawGridCols || entry.rows !== drawGridRows;
   if (dimsChanged) {
     drawGridCols = entry.cols;
@@ -1118,9 +1140,13 @@ function redoDraw() {
     pixels: cloneDrawPixelsData(),
     cols: drawGridCols,
     rows: drawGridRows,
+    objects: cloneDrawObjects(),
   });
   const entry = drawRedoStack.pop();
   drawPixels = entry.pixels.map((row) => row.slice());
+  drawObjects = entry.objects ? entry.objects.map(o => ({ ...o, relPixels: o.relPixels.map(p => p.slice()) })) : [];
+  selectedObjIdx = -1;
+  objDragState = null;
   const dimsChanged = entry.cols !== drawGridCols || entry.rows !== drawGridRows;
   if (dimsChanged) {
     drawGridCols = entry.cols;
@@ -1346,6 +1372,184 @@ function placePixelText(originX, originY, raw) {
   }
 }
 
+function createObjectFromPixels(type, relPixels, ox, oy) {
+  let maxRx = 0, maxRy = 0;
+  for (const [rx, ry] of relPixels) {
+    if (rx > maxRx) maxRx = rx;
+    if (ry > maxRy) maxRy = ry;
+  }
+  return {
+    type,
+    relPixels,
+    ox,
+    oy,
+    rotation: 0,
+    boundW: maxRx + 1,
+    boundH: maxRy + 1,
+  };
+}
+
+function getObjectAbsolutePixels(obj) {
+  const result = [];
+  for (const [rx, ry, hex] of obj.relPixels) {
+    let ax, ay;
+    const w = obj.boundW, h = obj.boundH;
+    switch (obj.rotation) {
+      case 1: ax = h - 1 - ry; ay = rx; break;
+      case 2: ax = w - 1 - rx; ay = h - 1 - ry; break;
+      case 3: ax = ry; ay = w - 1 - rx; break;
+      default: ax = rx; ay = ry;
+    }
+    result.push([obj.ox + ax, obj.oy + ay, hex]);
+  }
+  return result;
+}
+
+function getObjectBounds(obj) {
+  const rotW = (obj.rotation % 2 === 0) ? obj.boundW : obj.boundH;
+  const rotH = (obj.rotation % 2 === 0) ? obj.boundH : obj.boundW;
+  return { x: obj.ox, y: obj.oy, w: rotW, h: rotH };
+}
+
+function hitTestObject(obj, gx, gy) {
+  const pixels = getObjectAbsolutePixels(obj);
+  for (const [ax, ay] of pixels) {
+    if (ax === gx && ay === gy) return true;
+  }
+  return false;
+}
+
+function rotateObject(obj) {
+  obj.rotation = (obj.rotation + 1) % 4;
+}
+
+function commitObject(idx) {
+  if (idx < 0 || idx >= drawObjects.length) return;
+  pushDrawUndo();
+  const obj = drawObjects[idx];
+  const pixels = getObjectAbsolutePixels(obj);
+  for (const [ax, ay, hex] of pixels) {
+    if (ax >= 0 && ay >= 0 && ax < drawGridCols && ay < drawGridRows) {
+      drawPixels[ay][ax] = hex;
+    }
+  }
+  drawObjects.splice(idx, 1);
+  if (selectedObjIdx === idx) selectedObjIdx = -1;
+  else if (selectedObjIdx > idx) selectedObjIdx--;
+  drawDrawCanvas();
+}
+
+function commitAllObjects() {
+  while (drawObjects.length > 0) {
+    commitObject(0);
+  }
+}
+
+function deleteObject(idx) {
+  if (idx < 0 || idx >= drawObjects.length) return;
+  drawObjects.splice(idx, 1);
+  if (selectedObjIdx === idx) selectedObjIdx = -1;
+  else if (selectedObjIdx > idx) selectedObjIdx--;
+  drawDrawCanvas();
+}
+
+function renderObjects(ctx) {
+  const ps = drawPixelSize;
+  for (let i = 0; i < drawObjects.length; i++) {
+    const obj = drawObjects[i];
+    const pixels = getObjectAbsolutePixels(obj);
+    for (const [ax, ay, hex] of pixels) {
+      if (ax >= 0 && ay >= 0 && ax < drawGridCols && ay < drawGridRows) {
+        ctx.fillStyle = hex;
+        ctx.fillRect(ax * ps, ay * ps, ps, ps);
+      }
+    }
+    if (i === selectedObjIdx) {
+      const b = getObjectBounds(obj);
+      ctx.save();
+      ctx.strokeStyle = "rgba(50,130,246,0.85)";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 3]);
+      ctx.strokeRect(b.x * ps - 1, b.y * ps - 1, b.w * ps + 2, b.h * ps + 2);
+      ctx.setLineDash([]);
+      ctx.fillStyle = "rgba(50,130,246,0.15)";
+      ctx.fillRect(b.x * ps - 1, b.y * ps - 1, b.w * ps + 2, b.h * ps + 2);
+      ctx.restore();
+    }
+  }
+}
+
+function buildRectRelPixels(ax, ay, bx, by) {
+  const { x0, x1, y0, y1 } = normalizeCellRect(ax, ay, bx, by);
+  const hex = colorPicker.value;
+  const pixels = [];
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      if (y === y0 || y === y1 || x === x0 || x === x1) {
+        pixels.push([x - x0, y - y0, hex]);
+      }
+    }
+  }
+  return { pixels, ox: x0, oy: y0 };
+}
+
+function buildEllipseRelPixels(ax, ay, bx, by) {
+  const { x0, x1, y0, y1 } = normalizeCellRect(ax, ay, bx, by);
+  const hex = colorPicker.value;
+  const w = x1 - x0 + 1;
+  const h = y1 - y0 + 1;
+  const cx2 = x0 + (w - 1) / 2;
+  const cy2 = y0 + (h - 1) / 2;
+  const rx = w / 2;
+  const ry = h / 2;
+  const pixels = [];
+  if (rx < 1e-6 || ry < 1e-6) {
+    pixels.push([0, 0, hex]);
+    return { pixels, ox: Math.round(cx2), oy: Math.round(cy2) };
+  }
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      const dx = (x + 0.5 - cx2) / rx;
+      const dy = (y + 0.5 - cy2) / ry;
+      const d = dx * dx + dy * dy;
+      if (d > 1) continue;
+      const isEdge =
+        ((x - 1 < x0) || ((((x - 1 + 0.5 - cx2) / rx) ** 2 + dy * dy) > 1)) ||
+        ((x + 1 > x1) || ((((x + 1 + 0.5 - cx2) / rx) ** 2 + dy * dy) > 1)) ||
+        ((y - 1 < y0) || (((dx * dx) + (((y - 1 + 0.5 - cy2) / ry) ** 2)) > 1)) ||
+        ((y + 1 > y1) || (((dx * dx) + (((y + 1 + 0.5 - cy2) / ry) ** 2)) > 1));
+      if (isEdge) {
+        pixels.push([x - x0, y - y0, hex]);
+      }
+    }
+  }
+  return { pixels, ox: x0, oy: y0 };
+}
+
+function buildTextRelPixels(originX, originY, raw) {
+  const hex = colorPicker.value;
+  const s = String(raw).toUpperCase();
+  const pixels = [];
+  let cx = 0;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (ch === " ") { cx += 2; continue; }
+    const rows = PIXEL_GLYPH[ch] || PIXEL_GLYPH["?"];
+    if (!rows.length) { cx += 2; continue; }
+    const gw = rows[0].length;
+    const gh = rows.length;
+    for (let r = 0; r < gh; r++) {
+      const row = rows[r];
+      for (let c = 0; c < row.length; c++) {
+        if (row[c] !== "1") continue;
+        pixels.push([cx + c, r, hex]);
+      }
+    }
+    cx += gw + 1;
+  }
+  return { pixels, ox: originX, oy: originY };
+}
+
 function drawShapePreview(ctx) {
   if (!shapeDrag) return;
   const ps = drawPixelSize;
@@ -1465,10 +1669,17 @@ function finishShapeDrag(clientX, clientY, shiftKey = false) {
   );
   shapeDrag.x1 = end.x1;
   shapeDrag.y1 = end.y1;
+  let built;
   if (shapeDrag.kind === "rect") {
-    fillRectCells(shapeDrag.x0, shapeDrag.y0, shapeDrag.x1, shapeDrag.y1);
+    built = buildRectRelPixels(shapeDrag.x0, shapeDrag.y0, shapeDrag.x1, shapeDrag.y1);
   } else {
-    fillEllipseCells(shapeDrag.x0, shapeDrag.y0, shapeDrag.x1, shapeDrag.y1);
+    built = buildEllipseRelPixels(shapeDrag.x0, shapeDrag.y0, shapeDrag.x1, shapeDrag.y1);
+  }
+  if (built.pixels.length > 0) {
+    const obj = createObjectFromPixels(shapeDrag.kind, built.pixels, built.ox, built.oy);
+    drawObjects.push(obj);
+    selectedObjIdx = drawObjects.length - 1;
+    setMode("select");
   }
   shapeDrag = null;
   shapeDragShiftKey = false;
@@ -1494,6 +1705,27 @@ drawCanvas.addEventListener("mousedown", (e) => {
     sampleColorAt(e.clientX, e.clientY);
     return;
   }
+  if (drawingMode === "select") {
+    const { x, y } = clientToDrawCell(e.clientX, e.clientY);
+    let hitIdx = -1;
+    for (let i = drawObjects.length - 1; i >= 0; i--) {
+      if (hitTestObject(drawObjects[i], x, y)) { hitIdx = i; break; }
+    }
+    if (hitIdx === -1) {
+      const b = selectedObjIdx >= 0 ? getObjectBounds(drawObjects[selectedObjIdx]) : null;
+      if (b && x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h) {
+        hitIdx = selectedObjIdx;
+      }
+    }
+    if (hitIdx >= 0) {
+      selectedObjIdx = hitIdx;
+      objDragState = { startGx: x, startGy: y, origOx: drawObjects[hitIdx].ox, origOy: drawObjects[hitIdx].oy };
+      drawDrawCanvas();
+    } else {
+      if (selectedObjIdx >= 0) { selectedObjIdx = -1; drawDrawCanvas(); }
+    }
+    return;
+  }
   if (drawingMode === "pan") return;
   if (drawingMode === "text") {
     const { x, y } = clientToDrawCell(e.clientX, e.clientY);
@@ -1502,8 +1734,13 @@ drawCanvas.addEventListener("mousedown", (e) => {
     if (raw === null) return;
     const t = raw.trim();
     if (!t) return;
-    pushDrawUndo();
-    placePixelText(x, y, t);
+    const built = buildTextRelPixels(x, y, t);
+    if (built.pixels.length > 0) {
+      const obj = createObjectFromPixels("text", built.pixels, built.ox, built.oy);
+      drawObjects.push(obj);
+      selectedObjIdx = drawObjects.length - 1;
+      setMode("select");
+    }
     drawDrawCanvas();
     return;
   }
@@ -1518,7 +1755,6 @@ drawCanvas.addEventListener("mousedown", (e) => {
   if (drawingMode === "rect" || drawingMode === "ellipse") {
     const { x, y } = clientToDrawCell(e.clientX, e.clientY);
     if (x < 0 || y < 0 || x >= drawGridCols || y >= drawGridRows) return;
-    pushDrawUndo();
     shapeDragShiftKey = e.shiftKey;
     shapeDrag = {
       kind: drawingMode,
@@ -1535,6 +1771,10 @@ drawCanvas.addEventListener("mousedown", (e) => {
   paintAt(e.clientX, e.clientY);
 });
 window.addEventListener("pointerup", (e) => {
+  if (objDragState) {
+    objDragState = null;
+    return;
+  }
   if (shapeDrag) {
     finishShapeDrag(e.clientX, e.clientY, e.shiftKey);
     return;
@@ -1547,6 +1787,7 @@ window.addEventListener("pointerup", (e) => {
   drawDrawCanvas();
 });
 window.addEventListener("pointercancel", (e) => {
+  if (objDragState) { objDragState = null; return; }
   if (shapeDrag) {
     finishShapeDrag(e.clientX, e.clientY, e.shiftKey);
     return;
@@ -1559,6 +1800,15 @@ window.addEventListener("pointercancel", (e) => {
   drawDrawCanvas();
 });
 drawCanvas.addEventListener("mousemove", (e) => {
+  if (objDragState && selectedObjIdx >= 0) {
+    const { x, y } = clientToDrawCell(e.clientX, e.clientY);
+    const dx = x - objDragState.startGx;
+    const dy = y - objDragState.startGy;
+    drawObjects[selectedObjIdx].ox = objDragState.origOx + dx;
+    drawObjects[selectedObjIdx].oy = objDragState.origOy + dy;
+    scheduleDrawDrawCanvas();
+    return;
+  }
   if (shapeDrag) {
     shapeDragShiftKey = e.shiftKey;
     const { x, y } = clientToDrawCell(e.clientX, e.clientY);
@@ -1567,7 +1817,7 @@ drawCanvas.addEventListener("mousemove", (e) => {
     scheduleDrawDrawCanvas();
     return;
   }
-  if (drawingMode === "eyedropper" || drawingMode === "pan") return;
+  if (drawingMode === "eyedropper" || drawingMode === "pan" || drawingMode === "select") return;
   if (isDrawing) {
     paintAt(e.clientX, e.clientY);
   }
@@ -1577,6 +1827,26 @@ drawCanvas.addEventListener("touchstart", (e) => {
   const t = e.touches[0];
   if (drawingMode === "eyedropper") {
     sampleColorAt(t.clientX, t.clientY);
+    e.preventDefault();
+    return;
+  }
+  if (drawingMode === "select") {
+    const { x, y } = clientToDrawCell(t.clientX, t.clientY);
+    let hitIdx = -1;
+    for (let i = drawObjects.length - 1; i >= 0; i--) {
+      if (hitTestObject(drawObjects[i], x, y)) { hitIdx = i; break; }
+    }
+    if (hitIdx === -1 && selectedObjIdx >= 0) {
+      const b = getObjectBounds(drawObjects[selectedObjIdx]);
+      if (x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h) hitIdx = selectedObjIdx;
+    }
+    if (hitIdx >= 0) {
+      selectedObjIdx = hitIdx;
+      objDragState = { startGx: x, startGy: y, origOx: drawObjects[hitIdx].ox, origOy: drawObjects[hitIdx].oy };
+      drawDrawCanvas();
+    } else if (selectedObjIdx >= 0) {
+      selectedObjIdx = -1; drawDrawCanvas();
+    }
     e.preventDefault();
     return;
   }
@@ -1597,8 +1867,13 @@ drawCanvas.addEventListener("touchstart", (e) => {
     if (raw === null) return;
     const str = raw.trim();
     if (!str) return;
-    pushDrawUndo();
-    placePixelText(x, y, str);
+    const built = buildTextRelPixels(x, y, str);
+    if (built.pixels.length > 0) {
+      const obj = createObjectFromPixels("text", built.pixels, built.ox, built.oy);
+      drawObjects.push(obj);
+      selectedObjIdx = drawObjects.length - 1;
+      setMode("select");
+    }
     drawDrawCanvas();
     e.preventDefault();
     return;
@@ -1606,7 +1881,6 @@ drawCanvas.addEventListener("touchstart", (e) => {
   if (drawingMode === "rect" || drawingMode === "ellipse") {
     const { x, y } = clientToDrawCell(t.clientX, t.clientY);
     if (x < 0 || y < 0 || x >= drawGridCols || y >= drawGridRows) return;
-    pushDrawUndo();
     shapeDragShiftKey = false;
     shapeDrag = {
       kind: drawingMode,
@@ -1625,6 +1899,18 @@ drawCanvas.addEventListener("touchstart", (e) => {
   e.preventDefault();
 });
 drawCanvas.addEventListener("touchmove", (e) => {
+  if (objDragState && selectedObjIdx >= 0) {
+    const t = e.touches[0];
+    if (!t) return;
+    const { x, y } = clientToDrawCell(t.clientX, t.clientY);
+    const dx = x - objDragState.startGx;
+    const dy = y - objDragState.startGy;
+    drawObjects[selectedObjIdx].ox = objDragState.origOx + dx;
+    drawObjects[selectedObjIdx].oy = objDragState.origOy + dy;
+    scheduleDrawDrawCanvas();
+    e.preventDefault();
+    return;
+  }
   if (shapeDrag) {
     const t = e.touches[0];
     if (!t) return;
@@ -1636,7 +1922,7 @@ drawCanvas.addEventListener("touchmove", (e) => {
     e.preventDefault();
     return;
   }
-  if (drawingMode === "eyedropper" || drawingMode === "pan") return;
+  if (drawingMode === "eyedropper" || drawingMode === "pan" || drawingMode === "select") return;
   if (!isDrawing) return;
   const t = e.touches[0];
   paintAt(t.clientX, t.clientY);
@@ -1664,6 +1950,7 @@ function setMode(nextMode) {
     drawDrawCanvas();
   }
   drawingMode = nextMode;
+  if (selectBtn) selectBtn.classList.toggle("active", drawingMode === "select");
   penBtn.classList.toggle("active", drawingMode === "pen");
   eraserBtn.classList.toggle("active", drawingMode === "eraser");
   if (textBtn) textBtn.classList.toggle("active", drawingMode === "text");
@@ -1673,7 +1960,12 @@ function setMode(nextMode) {
   eyedropperBtn.classList.toggle("active", drawingMode === "eyedropper");
   if (drawPanBtn) drawPanBtn.classList.toggle("active", drawingMode === "pan");
   drawCanvas.classList.toggle("draw-canvas--eyedropper", drawingMode === "eyedropper");
+  drawCanvas.classList.toggle("draw-canvas--select", drawingMode === "select");
   drawCanvas.classList.toggle("draw-canvas--pan", drawingMode === "pan");
+  if (nextMode !== "select") {
+    objDragState = null;
+    if (selectedObjIdx >= 0) { selectedObjIdx = -1; drawDrawCanvas(); }
+  }
   syncDrawViewportPanCursor();
 }
 
@@ -1714,6 +2006,30 @@ window.addEventListener("keydown", (e) => {
     e.preventDefault();
     redoDraw();
     return;
+  }
+  if (drawingMode === "select" && selectedObjIdx >= 0) {
+    if (e.code === "KeyR" && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      rotateObject(drawObjects[selectedObjIdx]);
+      drawDrawCanvas();
+      return;
+    }
+    if (e.code === "Enter") {
+      e.preventDefault();
+      commitObject(selectedObjIdx);
+      return;
+    }
+    if (e.code === "Delete" || e.code === "Backspace") {
+      e.preventDefault();
+      deleteObject(selectedObjIdx);
+      return;
+    }
+    if (e.code === "Escape") {
+      e.preventDefault();
+      selectedObjIdx = -1;
+      drawDrawCanvas();
+      return;
+    }
   }
   if (isEyedropperHoldKey(e)) {
     if (e.repeat) return;
@@ -1781,6 +2097,7 @@ function switchFeatureTab(tab) {
   }
 }
 
+if (selectBtn) selectBtn.addEventListener("click", () => setMode("select"));
 penBtn.addEventListener("click", () => setMode("pen"));
 eraserBtn.addEventListener("click", () => setMode("eraser"));
 if (textBtn) textBtn.addEventListener("click", () => setMode("text"));
@@ -1798,6 +2115,9 @@ tabConvert.addEventListener("click", () => switchFeatureTab("convert"));
 tabDraw.addEventListener("click", () => switchFeatureTab("draw"));
 clearBtn.addEventListener("click", () => {
   pushDrawUndo();
+  drawObjects.length = 0;
+  selectedObjIdx = -1;
+  objDragState = null;
   initDrawPixels();
   drawDrawCanvas();
 });
@@ -2046,6 +2366,9 @@ function sendConvertToDraw() {
   resetDrawGridEdgeInputs();
   updateDrawGridSizeLabel();
   drawPixels = convertPixels.map((row) => row.slice());
+  drawObjects.length = 0;
+  selectedObjIdx = -1;
+  objDragState = null;
   drawUndoStack.length = 0;
   drawRedoStack.length = 0;
   updateUndoRedoButtons();

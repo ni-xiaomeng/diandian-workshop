@@ -30,9 +30,10 @@ body {
 }
 
 .app {
-  max-width: 980px;
+  max-width: 1400px;
+  width: calc(100% - 48px);
   margin: 0 auto;
-  padding: 28px 16px 48px;
+  padding: 28px 0 48px;
 }
 
 /* ── Brand ─────────────────────────────────── */

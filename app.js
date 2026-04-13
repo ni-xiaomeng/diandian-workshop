@@ -1389,26 +1389,45 @@ function createObjectFromPixels(type, relPixels, ox, oy) {
   };
 }
 
-function getObjectAbsolutePixels(obj) {
+function getRotatedRelPixels(obj) {
+  if (obj.rotation === 0) return obj.relPixels;
+  const cx = (obj.boundW - 1) / 2;
+  const cy = (obj.boundH - 1) / 2;
+  const angle = obj.rotation * Math.PI / 180;
+  const cosA = Math.cos(angle);
+  const sinA = Math.sin(angle);
   const result = [];
+  const seen = new Set();
   for (const [rx, ry, hex] of obj.relPixels) {
-    let ax, ay;
-    const w = obj.boundW, h = obj.boundH;
-    switch (obj.rotation) {
-      case 1: ax = h - 1 - ry; ay = rx; break;
-      case 2: ax = w - 1 - rx; ay = h - 1 - ry; break;
-      case 3: ax = ry; ay = w - 1 - rx; break;
-      default: ax = rx; ay = ry;
+    const dx = rx - cx;
+    const dy = ry - cy;
+    const newRx = Math.round(dx * cosA - dy * sinA + cx);
+    const newRy = Math.round(dx * sinA + dy * cosA + cy);
+    const key = (newRx << 16) | (newRy & 0xffff);
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push([newRx, newRy, hex]);
     }
-    result.push([obj.ox + ax, obj.oy + ay, hex]);
   }
   return result;
 }
 
+function getObjectAbsolutePixels(obj) {
+  const rotated = getRotatedRelPixels(obj);
+  return rotated.map(([rx, ry, hex]) => [obj.ox + rx, obj.oy + ry, hex]);
+}
+
 function getObjectBounds(obj) {
-  const rotW = (obj.rotation % 2 === 0) ? obj.boundW : obj.boundH;
-  const rotH = (obj.rotation % 2 === 0) ? obj.boundH : obj.boundW;
-  return { x: obj.ox, y: obj.oy, w: rotW, h: rotH };
+  const pixels = getRotatedRelPixels(obj);
+  if (pixels.length === 0) return { x: obj.ox, y: obj.oy, w: 1, h: 1 };
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const [rx, ry] of pixels) {
+    minX = Math.min(minX, rx);
+    maxX = Math.max(maxX, rx);
+    minY = Math.min(minY, ry);
+    maxY = Math.max(maxY, ry);
+  }
+  return { x: obj.ox + minX, y: obj.oy + minY, w: maxX - minX + 1, h: maxY - minY + 1 };
 }
 
 function hitTestObject(obj, gx, gy) {
@@ -1420,7 +1439,25 @@ function hitTestObject(obj, gx, gy) {
 }
 
 function rotateObject(obj) {
-  obj.rotation = (obj.rotation + 1) % 4;
+  const b1 = getObjectBounds(obj);
+  const cx1 = b1.x + (b1.w - 1) / 2;
+  const cy1 = b1.y + (b1.h - 1) / 2;
+
+  obj.rotation = (obj.rotation + 45) % 360;
+
+  const rotPx = getRotatedRelPixels(obj);
+  if (rotPx.length === 0) return;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const [rx, ry] of rotPx) {
+    minX = Math.min(minX, rx);
+    maxX = Math.max(maxX, rx);
+    minY = Math.min(minY, ry);
+    maxY = Math.max(maxY, ry);
+  }
+  const newCenterRx = (minX + maxX) / 2;
+  const newCenterRy = (minY + maxY) / 2;
+  obj.ox = Math.round(cx1 - newCenterRx);
+  obj.oy = Math.round(cy1 - newCenterRy);
 }
 
 function commitObject(idx) {

@@ -799,8 +799,7 @@ button:hover {
 
 .draw-workspace__canvas.canvas-wrap {
   flex: 0 0 auto;
-  width: auto;
-  min-height: 0;
+  align-items: center;
 }
 
 .convert-view-stack {
@@ -858,7 +857,6 @@ button:hover {
 .draw-workspace__canvas {
   flex: 0 0 auto;
   min-width: 0;
-  align-self: center;
 }
 
 /* ── Color Picker Float ──────────────────────── */

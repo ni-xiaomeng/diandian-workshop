@@ -450,18 +450,8 @@ function drawDrawCanvas() {
 
 function syncDrawViewportSize() {
   if (!drawZoomViewport || !drawCanvas) return;
-  const zoomed = drawZoom > 1 + 1e-3;
-  if (zoomed) {
-    drawZoomViewport.style.width = "100%";
-    drawZoomViewport.style.height = "100%";
-  } else {
-    const cw = drawCanvas.offsetWidth || drawCanvas.clientWidth || 0;
-    const ch = drawCanvas.offsetHeight || drawCanvas.clientHeight || 0;
-    if (cw > 0 && ch > 0) {
-      drawZoomViewport.style.width = cw + "px";
-      drawZoomViewport.style.height = ch + "px";
-    }
-  }
+  drawZoomViewport.style.width = "100%";
+  drawZoomViewport.style.height = "100%";
 }
 
 /**
@@ -1192,32 +1182,51 @@ function clampDrawZoom(z) {
   return Math.max(DRAW_ZOOM_MIN, Math.min(DRAW_ZOOM_MAX, z));
 }
 
-function setDrawZoom(next) {
+function setDrawZoom(next, centerOnViewport = true) {
+  const prevZoom = drawZoom;
   drawZoom = clampDrawZoom(Number(next) || 1);
-  const isOne = Math.abs(drawZoom - 1) < 0.001;
-  const zoomed = drawZoom > 1;
   const cw = drawCanvas.offsetWidth || drawCanvas.clientWidth || 400;
   const ch = drawCanvas.offsetHeight || drawCanvas.clientHeight || 400;
+  const scaledW = Math.ceil(cw * drawZoom);
+  const scaledH = Math.ceil(ch * drawZoom);
+
+  let vpCenterRatioX = 0.5, vpCenterRatioY = 0.5;
+  if (centerOnViewport && drawZoomViewport && prevZoom > 0) {
+    const vw = drawZoomViewport.clientWidth;
+    const vh = drawZoomViewport.clientHeight;
+    const prevScaledW = Math.ceil(cw * prevZoom);
+    const prevScaledH = Math.ceil(ch * prevZoom);
+    const prevContentW = Math.max(prevScaledW, vw);
+    const prevContentH = Math.max(prevScaledH, vh);
+    const cx = drawZoomViewport.scrollLeft + vw / 2;
+    const cy = drawZoomViewport.scrollTop + vh / 2;
+    vpCenterRatioX = cx / prevContentW;
+    vpCenterRatioY = cy / prevContentH;
+  }
+
+  const isOne = Math.abs(drawZoom - 1) < 0.001;
   drawCanvas.style.transform = isOne ? "" : `scale(${drawZoom})`;
   drawCanvas.style.transformOrigin = "0 0";
+
   if (drawZoomInner) {
-    drawZoomInner.style.transform = "";
-    if (zoomed) {
-      drawZoomInner.style.width = Math.ceil(cw * drawZoom) + "px";
-      drawZoomInner.style.height = Math.ceil(ch * drawZoom) + "px";
-    } else if (!isOne) {
-      drawZoomInner.style.width = Math.ceil(cw * drawZoom) + "px";
-      drawZoomInner.style.height = Math.ceil(ch * drawZoom) + "px";
-    } else {
-      drawZoomInner.style.width = "";
-      drawZoomInner.style.height = "";
-    }
+    drawZoomInner.style.width = isOne ? "" : scaledW + "px";
+    drawZoomInner.style.height = isOne ? "" : scaledH + "px";
   }
   if (drawZoomLabel) {
     drawZoomLabel.textContent = `${Math.round(drawZoom * 100)}%`;
   }
   if (drawZoomViewport) {
-    drawZoomViewport.style.overflow = zoomed ? "auto" : "hidden";
+    const vw = drawZoomViewport.clientWidth;
+    const vh = drawZoomViewport.clientHeight;
+    const overflows = scaledW > vw || scaledH > vh;
+    drawZoomViewport.style.overflow = overflows ? "auto" : "hidden";
+
+    if (overflows && centerOnViewport) {
+      const contentW = Math.max(scaledW, vw);
+      const contentH = Math.max(scaledH, vh);
+      drawZoomViewport.scrollLeft = vpCenterRatioX * contentW - vw / 2;
+      drawZoomViewport.scrollTop = vpCenterRatioY * contentH - vh / 2;
+    }
   }
 }
 

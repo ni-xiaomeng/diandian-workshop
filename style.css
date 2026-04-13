@@ -969,7 +969,9 @@ button:hover {
 /* ── Zoom Viewport ───────────────────────────── */
 .draw-zoom-viewport {
   overflow: hidden;
-  display: block;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   padding: 0;
   box-sizing: border-box;
   border-radius: var(--radius-sm);
@@ -982,6 +984,7 @@ button:hover {
 
 .draw-zoom-inner {
   position: relative;
+  flex-shrink: 0;
 }
 
 /* ── SV Hue Picker ───────────────────────────── */

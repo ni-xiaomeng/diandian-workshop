@@ -26,6 +26,8 @@ const convertSmartColorEl = document.getElementById("convertSmartColor");
 const convertColorExtractRange = document.getElementById("convertColorExtractRange");
 const convertColorExtractVal = document.getElementById("convertColorExtractVal");
 const showConvertOriginalEl = document.getElementById("showConvertOriginal");
+const priorityValueEl = document.getElementById("priorityValue");
+const priorityHueEl = document.getElementById("priorityHue");
 const convertOriginalView = document.getElementById("convertOriginalView");
 const convertColorSummary = document.getElementById("convertColorSummary");
 const convertColorSwatches = document.getElementById("convertColorSwatches");
@@ -254,6 +256,13 @@ function syncConvertColorExtractDisplay() {
   const v = Math.max(1, Math.min(100, Number(convertColorExtractRange.value) || 50));
   convertColorExtractRange.value = String(v);
   convertColorExtractVal.textContent = String(v);
+}
+
+function getColorPriorities() {
+  return {
+    value: priorityValueEl ? priorityValueEl.checked : false,
+    hue: priorityHueEl ? priorityHueEl.checked : true,
+  };
 }
 
 function readGridSize(inputEl, fallback = 32) {
@@ -733,6 +742,8 @@ function buildSmartConvertPalette(rgbCells, maxColors, cols, rows) {
     return [[Math.round(sr / n), Math.round(sg / n), Math.round(sb / n)]];
   }
 
+  const pri = getColorPriorities();
+
   const { bgRgbs, fgCells } = detectBackground(rgbCells, cols, rows);
   const palette = [];
   for (const bg of bgRgbs) {
@@ -765,7 +776,11 @@ function buildSmartConvertPalette(rgbCells, maxColors, cols, rows) {
   const bucketKey = (B) => (B.r >> 2) * 4096 + (B.g >> 2) * 64 + (B.b >> 2);
   const tried = new Set();
   const maxGreedyIters = targetSize + Math.min(greedyBuckets.length, 2048) + 128;
-  const hueBoostStrength = targetSize <= 8 ? 3.0 : targetSize <= 16 ? 1.8 : targetSize <= 30 ? 1.0 : 0;
+
+  const baseHueBoost = targetSize <= 8 ? 3.0 : targetSize <= 16 ? 1.8 : targetSize <= 30 ? 1.0 : 0;
+  const hueBoostStrength = pri.hue ? baseHueBoost * 1.6 : baseHueBoost * 0.3;
+  const valBoostStrength = pri.value ? (targetSize <= 8 ? 2.5 : targetSize <= 16 ? 1.5 : 0.8) : 0;
+
   let greedyIters = 0;
   while (palette.length < targetSize && greedyIters < maxGreedyIters) {
     greedyIters++;
@@ -776,12 +791,15 @@ function buildSmartConvertPalette(rgbCells, maxColors, cols, rows) {
       const d = minRedmeanDistToPalette(B.r, B.g, B.b, palette);
       if (d < 1) continue;
       let score = B.n * d;
-      if (hueBoostStrength > 0) {
-        const bHsv = rgbToHsv(B.r, B.g, B.b);
-        if (bHsv.s > 0.12 && bHsv.v > 0.10) {
-          const hd = minHueDistToPalette(bHsv.h, bHsv.s, palette);
-          score *= (1 + hd * hueBoostStrength);
-        }
+      const bHsv = rgbToHsv(B.r, B.g, B.b);
+
+      if (hueBoostStrength > 0 && bHsv.s > 0.12 && bHsv.v > 0.10) {
+        const hd = minHueDistToPalette(bHsv.h, bHsv.s, palette);
+        score *= (1 + hd * hueBoostStrength);
+      }
+      if (valBoostStrength > 0) {
+        const vd = minValDistToPalette(bHsv.v, palette);
+        score *= (1 + vd * valBoostStrength);
       }
       if (score > bestScore) { bestScore = score; best = B; bestKey = bk; }
     }
@@ -869,11 +887,18 @@ function mergeColorsToTarget(finalRgbs, targetMax) {
   }
   if (used.size <= targetMax) return finalRgbs;
 
+  const pri = getColorPriorities();
+
   let colors = [...used.entries()].map(([key, cnt]) => ({
     r: (key >> 16) & 255, g: (key >> 8) & 255, b: key & 255, cnt,
   }));
   const hsvCache = colors.map(c => rgbToHsv(c.r, c.g, c.b));
-  const hueMergePenalty = targetMax <= 8 ? 8000 : targetMax <= 16 ? 4000 : targetMax <= 30 ? 2000 : 0;
+
+  const baseHuePenalty = targetMax <= 8 ? 8000 : targetMax <= 16 ? 4000 : targetMax <= 30 ? 2000 : 0;
+  const hueMergePenalty = pri.hue ? baseHuePenalty * 1.8 : baseHuePenalty * 0.3;
+  const baseValPenalty = targetMax <= 8 ? 6000 : targetMax <= 16 ? 3000 : targetMax <= 30 ? 1500 : 0;
+  const valMergePenalty = pri.value ? baseValPenalty : 0;
+
   while (colors.length > targetMax) {
     let minD = Infinity, mi = 0, mj = 1;
     for (let i = 0; i < colors.length; i++) {
@@ -882,11 +907,12 @@ function mergeColorsToTarget(finalRgbs, targetMax) {
           colors[i].r, colors[i].g, colors[i].b,
           colors[j].r, colors[j].g, colors[j].b
         );
-        if (hueMergePenalty > 0) {
-          const hi = hsvCache[i], hj = hsvCache[j];
-          if (hi.s > 0.12 && hj.s > 0.12) {
-            d += hueDist(hi.h, hj.h) * hueMergePenalty;
-          }
+        const hi = hsvCache[i], hj = hsvCache[j];
+        if (hueMergePenalty > 0 && hi.s > 0.12 && hj.s > 0.12) {
+          d += hueDist(hi.h, hj.h) * hueMergePenalty;
+        }
+        if (valMergePenalty > 0) {
+          d += Math.abs(hi.v - hj.v) * valMergePenalty;
         }
         if (d < minD) { minD = d; mi = i; mj = j; }
       }
@@ -952,6 +978,15 @@ function minHueDistToPalette(h, s, palette) {
   return minD;
 }
 
+function minValDistToPalette(v, palette) {
+  let minD = 1;
+  for (const p of palette) {
+    const hp = rgbToHsv(p[0], p[1], p[2]);
+    minD = Math.min(minD, Math.abs(v - hp.v));
+  }
+  return minD;
+}
+
 function nearestInPalette(r, g, b, palette) {
   if (!palette.length) return [r, g, b];
   let best = palette[0];
@@ -978,9 +1013,14 @@ function nearestInPaletteConvert(r, g, b, palette) {
     return nearestInPalette(r, g, b, palette);
   }
 
+  const pri = getColorPriorities();
+
   const protectBright = Ls > 0.07 && vSrc > 0.22;
   const protectChroma = sSrc > 0.13;
   const protectHue = sSrc > 0.18 && vSrc > 0.15;
+
+  const valWeight = pri.value ? 2.2 : 1.0;
+  const hueWeight = pri.hue ? 2.2 : 0.6;
 
   let best = palette[0];
   let bestScore = Infinity;
@@ -993,9 +1033,9 @@ function nearestInPaletteConvert(r, g, b, palette) {
     if (protectBright) {
       const gap = Ls - Lp;
       if (gap > 0.035) {
-        penalty += gap * gap * 22000;
+        penalty += gap * gap * 22000 * valWeight;
       } else if (gap > 0.018) {
-        penalty += (gap - 0.018) * 6500;
+        penalty += (gap - 0.018) * 6500 * valWeight;
       }
     }
 
@@ -1008,7 +1048,7 @@ function nearestInPaletteConvert(r, g, b, palette) {
     if (protectHue && hsvp.s > 0.10) {
       const hd = hueDist(hSrc, hsvp.h);
       if (hd > 0.08) {
-        penalty += hd * hd * 18000;
+        penalty += hd * hd * 18000 * hueWeight;
       }
     }
 
@@ -1958,6 +1998,14 @@ convertSmartColorEl.addEventListener("change", () => {
   if (selectedImage) {
     convertImageToPixels();
   }
+});
+
+[priorityValueEl, priorityHueEl].forEach(el => {
+  if (el) el.addEventListener("change", () => {
+    if (selectedImage && convertSmartColorEl.checked) {
+      convertImageToPixels();
+    }
+  });
 });
 
 if (convertColorExtractRange) {

@@ -778,8 +778,8 @@ function buildSmartConvertPalette(rgbCells, maxColors, cols, rows) {
   const maxGreedyIters = targetSize + Math.min(greedyBuckets.length, 2048) + 128;
 
   const baseHueBoost = targetSize <= 8 ? 3.0 : targetSize <= 16 ? 1.8 : targetSize <= 30 ? 1.0 : 0;
-  const hueBoostStrength = pri.hue ? baseHueBoost * 1.6 : baseHueBoost * 0.3;
-  const valBoostStrength = pri.value ? (targetSize <= 8 ? 2.5 : targetSize <= 16 ? 1.5 : 0.8) : 0;
+  const hueBoostStrength = pri.hue ? baseHueBoost * 4.0 : baseHueBoost * 0.08;
+  const valBoostStrength = pri.value ? (targetSize <= 8 ? 6.0 : targetSize <= 16 ? 3.5 : 1.5) : 0;
 
   let greedyIters = 0;
   while (palette.length < targetSize && greedyIters < maxGreedyIters) {
@@ -793,9 +793,9 @@ function buildSmartConvertPalette(rgbCells, maxColors, cols, rows) {
       let score = B.n * d;
       const bHsv = rgbToHsv(B.r, B.g, B.b);
 
-      if (hueBoostStrength > 0 && bHsv.s > 0.12 && bHsv.v > 0.10) {
+      if (hueBoostStrength > 0 && bHsv.s > 0.08 && bHsv.v > 0.08) {
         const hd = minHueDistToPalette(bHsv.h, bHsv.s, palette);
-        score *= (1 + hd * hueBoostStrength);
+        score *= (1 + hd * hd * hueBoostStrength * 6);
       }
       if (valBoostStrength > 0) {
         const vd = minValDistToPalette(bHsv.v, palette);
@@ -895,9 +895,9 @@ function mergeColorsToTarget(finalRgbs, targetMax) {
   const hsvCache = colors.map(c => rgbToHsv(c.r, c.g, c.b));
 
   const baseHuePenalty = targetMax <= 8 ? 8000 : targetMax <= 16 ? 4000 : targetMax <= 30 ? 2000 : 0;
-  const hueMergePenalty = pri.hue ? baseHuePenalty * 1.8 : baseHuePenalty * 0.3;
-  const baseValPenalty = targetMax <= 8 ? 6000 : targetMax <= 16 ? 3000 : targetMax <= 30 ? 1500 : 0;
-  const valMergePenalty = pri.value ? baseValPenalty : 0;
+  const hueMergePenalty = pri.hue ? baseHuePenalty * 4.0 : baseHuePenalty * 0.08;
+  const baseValPenalty = targetMax <= 8 ? 10000 : targetMax <= 16 ? 5000 : targetMax <= 30 ? 2500 : 0;
+  const valMergePenalty = pri.value ? baseValPenalty * 3.0 : 0;
 
   while (colors.length > targetMax) {
     let minD = Infinity, mi = 0, mj = 1;
@@ -1017,10 +1017,10 @@ function nearestInPaletteConvert(r, g, b, palette) {
 
   const protectBright = Ls > 0.07 && vSrc > 0.22;
   const protectChroma = sSrc > 0.13;
-  const protectHue = sSrc > 0.18 && vSrc > 0.15;
+  const protectHue = pri.hue ? (sSrc > 0.10 && vSrc > 0.10) : (sSrc > 0.18 && vSrc > 0.15);
 
-  const valWeight = pri.value ? 2.2 : 1.0;
-  const hueWeight = pri.hue ? 2.2 : 0.6;
+  const valWeight = pri.value ? 4.5 : 0.8;
+  const hueWeight = pri.hue ? 5.0 : 0.15;
 
   let best = palette[0];
   let bestScore = Infinity;
@@ -1031,11 +1031,13 @@ function nearestInPaletteConvert(r, g, b, palette) {
     const hsvp = rgbToHsv(p[0], p[1], p[2]);
 
     if (protectBright) {
-      const gap = Ls - Lp;
-      if (gap > 0.035) {
+      const gap = Math.abs(Ls - Lp);
+      const valThresholdHigh = pri.value ? 0.015 : 0.035;
+      const valThresholdLow = pri.value ? 0.008 : 0.018;
+      if (gap > valThresholdHigh) {
         penalty += gap * gap * 22000 * valWeight;
-      } else if (gap > 0.018) {
-        penalty += (gap - 0.018) * 6500 * valWeight;
+      } else if (gap > valThresholdLow) {
+        penalty += (gap - valThresholdLow) * 6500 * valWeight;
       }
     }
 
@@ -1045,9 +1047,10 @@ function nearestInPaletteConvert(r, g, b, palette) {
       }
     }
 
-    if (protectHue && hsvp.s > 0.10) {
+    if (protectHue && hsvp.s > 0.08) {
       const hd = hueDist(hSrc, hsvp.h);
-      if (hd > 0.08) {
+      const hueThreshold = pri.hue ? 0.04 : 0.08;
+      if (hd > hueThreshold) {
         penalty += hd * hd * 18000 * hueWeight;
       }
     }

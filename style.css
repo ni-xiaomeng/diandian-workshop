@@ -458,13 +458,56 @@ body {
 }
 
 .draw-sidebar__size {
-  font-size: 0.62rem;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0;
+  margin-top: auto;
+  padding: 2px 0;
+  line-height: 1;
+}
+.grid-size-input {
+  width: 22px;
+  height: auto;
+  min-height: 0;
+  border: none;
+  border-radius: 0;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  font: inherit;
+  font-size: 0.6rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   text-align: center;
-  margin-top: auto;
-  padding: 4px 0;
   color: #aaa;
+  padding: 0 0 1px;
+  margin: 0;
+  outline: none;
+  line-height: 1;
+  -moz-appearance: textfield;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.grid-size-input::-webkit-inner-spin-button,
+.grid-size-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  display: none;
+  margin: 0;
+}
+.grid-size-input:hover {
+  color: #666;
+  border-bottom-color: #ccc;
+}
+.grid-size-input:focus {
+  color: #333;
+  border-bottom-color: #888;
+}
+.grid-size-x {
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: #aaa;
+  line-height: 1;
+  user-select: none;
 }
 
 /* ── Canvas Area + Edge Buttons ──────────────── */

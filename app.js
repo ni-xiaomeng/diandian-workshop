@@ -15,6 +15,8 @@ const edgeLeftMinus = document.getElementById("edgeLeftMinus");
 const edgeRightPlus = document.getElementById("edgeRightPlus");
 const edgeRightMinus = document.getElementById("edgeRightMinus");
 const drawGridSizeLabel = document.getElementById("drawGridSizeLabel");
+const drawGridColsInput = document.getElementById("drawGridColsInput");
+const drawGridRowsInput = document.getElementById("drawGridRowsInput");
 
 const sourceSlot = document.getElementById("sourceSlot");
 const sourceSlotEmpty = document.getElementById("sourceSlotEmpty");
@@ -64,6 +66,7 @@ const drawZoomResetBtn = document.getElementById("drawZoomReset");
 const drawZoomLabel = document.getElementById("drawZoomLabel");
 const drawPanBtn = document.getElementById("drawPanBtn");
 const selectBtn = document.getElementById("selectBtn");
+const rotateObjBtn = document.getElementById("rotateObjBtn");
 const undoDrawBtn = document.getElementById("undoDrawBtn");
 const redoDrawBtn = document.getElementById("redoDrawBtn");
 const drawColorFloat = document.getElementById("drawColorFloat");
@@ -161,6 +164,46 @@ const PIXEL_GLYPH = {
   Y: ["10001", "10001", "01010", "00100", "00100", "00100", "00100"],
   Z: ["11111", "00001", "00010", "00100", "01000", "10000", "11111"],
   "?": ["01110", "10001", "00010", "00100", "00100", "00000", "00100"],
+  a: ["00000", "00000", "01110", "00001", "01111", "10001", "01111"],
+  b: ["10000", "10000", "11110", "10001", "10001", "10001", "11110"],
+  c: ["00000", "00000", "01110", "10000", "10000", "10000", "01110"],
+  d: ["00001", "00001", "01111", "10001", "10001", "10001", "01111"],
+  e: ["00000", "00000", "01110", "10001", "11111", "10000", "01110"],
+  f: ["00110", "01000", "01000", "11100", "01000", "01000", "01000"],
+  g: ["00000", "00000", "01111", "10001", "01111", "00001", "01110"],
+  h: ["10000", "10000", "10110", "11001", "10001", "10001", "10001"],
+  i: ["00100", "00000", "01100", "00100", "00100", "00100", "01110"],
+  j: ["00010", "00000", "00110", "00010", "00010", "10010", "01100"],
+  k: ["10000", "10000", "10010", "10100", "11000", "10100", "10010"],
+  l: ["01100", "00100", "00100", "00100", "00100", "00100", "01110"],
+  m: ["00000", "00000", "11010", "10101", "10101", "10001", "10001"],
+  n: ["00000", "00000", "10110", "11001", "10001", "10001", "10001"],
+  o: ["00000", "00000", "01110", "10001", "10001", "10001", "01110"],
+  p: ["00000", "00000", "11110", "10001", "11110", "10000", "10000"],
+  q: ["00000", "00000", "01111", "10001", "01111", "00001", "00001"],
+  r: ["00000", "00000", "10110", "11000", "10000", "10000", "10000"],
+  s: ["00000", "00000", "01110", "10000", "01110", "00001", "11110"],
+  t: ["01000", "01000", "11100", "01000", "01000", "01000", "00110"],
+  u: ["00000", "00000", "10001", "10001", "10001", "10011", "01101"],
+  v: ["00000", "00000", "10001", "10001", "10001", "01010", "00100"],
+  w: ["00000", "00000", "10001", "10001", "10101", "10101", "01010"],
+  x: ["00000", "00000", "10001", "01010", "00100", "01010", "10001"],
+  y: ["00000", "00000", "10001", "10001", "01111", "00001", "01110"],
+  z: ["00000", "00000", "11111", "00010", "00100", "01000", "11111"],
+  "!": ["00100", "00100", "00100", "00100", "00100", "00000", "00100"],
+  ".": ["00000", "00000", "00000", "00000", "00000", "00000", "00100"],
+  ",": ["00000", "00000", "00000", "00000", "00000", "00100", "01000"],
+  ":": ["00000", "00000", "00100", "00000", "00000", "00100", "00000"],
+  ";": ["00000", "00000", "00100", "00000", "00000", "00100", "01000"],
+  "-": ["00000", "00000", "00000", "11111", "00000", "00000", "00000"],
+  "+": ["00000", "00100", "00100", "11111", "00100", "00100", "00000"],
+  "=": ["00000", "00000", "11111", "00000", "11111", "00000", "00000"],
+  "(": ["00010", "00100", "01000", "01000", "01000", "00100", "00010"],
+  ")": ["01000", "00100", "00010", "00010", "00010", "00100", "01000"],
+  "/": ["00001", "00010", "00010", "00100", "01000", "01000", "10000"],
+  "#": ["01010", "01010", "11111", "01010", "11111", "01010", "01010"],
+  "@": ["01110", "10001", "10111", "10101", "10110", "10000", "01110"],
+  "'": ["00100", "00100", "00000", "00000", "00000", "00000", "00000"],
 };
 
 let shapeDrag = null;
@@ -172,6 +215,7 @@ let eyedropperFromHold = false;
 let drawObjects = [];
 let selectedObjIdx = -1;
 let objDragState = null;
+let cornerResizeState = null;
 
 function pickerHueSlot() {
   return Math.round((((pickerHue % 360) + 360) % 360) * 100);
@@ -285,9 +329,8 @@ function syncConvertRangesFromInputs() {
 }
 
 function updateDrawGridSizeLabel() {
-  if (drawGridSizeLabel) {
-    drawGridSizeLabel.textContent = `${drawGridCols}×${drawGridRows}`;
-  }
+  if (drawGridColsInput) drawGridColsInput.value = drawGridCols;
+  if (drawGridRowsInput) drawGridRowsInput.value = drawGridRows;
 }
 
 function resetDrawGridEdgeInputs() {
@@ -327,6 +370,68 @@ function applyEdgeResize(dT, dB, dL, dR) {
   drawDrawCanvas();
   restoreDrawViewportScrollRatio(scrollPrev);
   updateDrawGridSizeLabel();
+}
+
+function getContentBounds() {
+  const rows = drawGridRows, cols = drawGridCols;
+  let minX = cols, maxX = -1, minY = rows, maxY = -1;
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const h = normalizeHex(drawPixels[y][x]);
+      if (h !== "#ffffff" && h !== "#fff") {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  for (let i = 0; i < drawObjects.length; i++) {
+    const obj = drawObjects[i];
+    const b = getObjectBounds(obj);
+    if (b.x < minX) minX = b.x;
+    if (b.x + b.w - 1 > maxX) maxX = b.x + b.w - 1;
+    if (b.y < minY) minY = b.y;
+    if (b.y + b.h - 1 > maxY) maxY = b.y + b.h - 1;
+  }
+  if (maxX < 0) return null;
+  return { minX, maxX, minY, maxY, w: maxX - minX + 1, h: maxY - minY + 1 };
+}
+
+function applyCenterResize(newCols, newRows) {
+  newCols = Math.max(1, Math.min(GRID_MAX, newCols));
+  newRows = Math.max(1, Math.min(GRID_MAX, newRows));
+  if (newCols === drawGridCols && newRows === drawGridRows) return;
+
+  const dw = newCols - drawGridCols;
+  const dh = newRows - drawGridRows;
+  const dL = Math.floor(dw / 2);
+  const dR = dw - dL;
+  const dT = Math.floor(dh / 2);
+  const dB = dh - dT;
+
+  if (dw < 0 || dh < 0) {
+    const cb = getContentBounds();
+    if (cb) {
+      const cropL = -Math.min(dL, 0);
+      const cropR = -Math.min(dR, 0);
+      const cropT = -Math.min(dT, 0);
+      const cropB = -Math.min(dB, 0);
+      const wouldCrop =
+        cb.minX < cropL ||
+        cb.maxX >= drawGridCols - cropR ||
+        cb.minY < cropT ||
+        cb.maxY >= drawGridRows - cropB;
+      if (wouldCrop) {
+        if (!confirm("缩小画布会裁切到已有图像内容，确定继续吗？")) {
+          updateDrawGridSizeLabel();
+          return;
+        }
+      }
+    }
+  }
+
+  applyEdgeResize(dT, dB, dL, dR);
 }
 
 function autoPixelSize(canvas, cols, rows) {
@@ -796,13 +901,25 @@ function buildSmartConvertPalette(rgbCells, maxColors, cols, rows) {
       let score = B.n * d;
       const bHsv = rgbToHsv(B.r, B.g, B.b);
 
-      if (hueBoostStrength > 0 && bHsv.s > 0.08 && bHsv.v > 0.08) {
-        const hd = minHueDistToPalette(bHsv.h, bHsv.s, palette);
-        score *= (1 + hd * hd * hueBoostStrength * 6);
+      if (pri.hue) {
+        if (hueBoostStrength > 0 && bHsv.s > 0.08 && bHsv.v > 0.08) {
+          const hd = minHueDistToPalette(bHsv.h, bHsv.s, palette);
+          score *= (1 + hd * hd * hueBoostStrength * 6);
+        }
+        const satBonus = targetSize <= 8 ? 8.0 : targetSize <= 16 ? 4.0 : 2.0;
+        score *= (1 + bHsv.s * bHsv.s * satBonus);
+      } else {
+        if (hueBoostStrength > 0 && bHsv.s > 0.08 && bHsv.v > 0.08) {
+          const hd = minHueDistToPalette(bHsv.h, bHsv.s, palette);
+          score *= (1 + hd * hd * hueBoostStrength * 6);
+        }
       }
       if (valBoostStrength > 0) {
         const vd = minValDistToPalette(bHsv.v, palette);
         score *= (1 + vd * valBoostStrength);
+        const extremeV = Math.max(bHsv.v, 1 - bHsv.v);
+        const extremeBonus = targetSize <= 8 ? 5.0 : targetSize <= 16 ? 3.0 : 1.5;
+        score *= (1 + extremeV * extremeV * extremeBonus);
       }
       if (score > bestScore) { bestScore = score; best = B; bestKey = bk; }
     }
@@ -914,8 +1031,19 @@ function mergeColorsToTarget(finalRgbs, targetMax) {
         if (hueMergePenalty > 0 && hi.s > 0.12 && hj.s > 0.12) {
           d += hueDist(hi.h, hj.h) * hueMergePenalty;
         }
+        if (pri.hue) {
+          const avgSat = (hi.s + hj.s) / 2;
+          const satProtect = targetMax <= 8 ? 15000 : targetMax <= 16 ? 8000 : 3000;
+          d += avgSat * avgSat * satProtect;
+        }
         if (valMergePenalty > 0) {
           d += Math.abs(hi.v - hj.v) * valMergePenalty;
+        }
+        if (pri.value) {
+          const extremeI = Math.max(hi.v, 1 - hi.v);
+          const extremeJ = Math.max(hj.v, 1 - hj.v);
+          const extremeProtect = targetMax <= 8 ? 12000 : targetMax <= 16 ? 6000 : 2500;
+          d += (extremeI + extremeJ) * 0.5 * extremeProtect * Math.abs(hi.v - hj.v);
         }
         if (d < minD) { minD = d; mi = i; mj = j; }
       }
@@ -1022,8 +1150,9 @@ function nearestInPaletteConvert(r, g, b, palette) {
   const protectChroma = sSrc > 0.13;
   const protectHue = pri.hue ? (sSrc > 0.10 && vSrc > 0.10) : (sSrc > 0.18 && vSrc > 0.15);
 
-  const valWeight = pri.value ? 4.5 : 0.8;
-  const hueWeight = pri.hue ? 5.0 : 0.15;
+  const isExtremeV = vSrc > 0.85 || vSrc < 0.15;
+  const valWeight = pri.value ? (isExtremeV ? 7.0 : 4.5) : 0.8;
+  const hueWeight = pri.hue ? (sSrc > 0.5 ? 8.0 : 5.0) : 0.15;
 
   let best = palette[0];
   let bestScore = Infinity;
@@ -1044,6 +1173,13 @@ function nearestInPaletteConvert(r, g, b, palette) {
       }
     }
 
+    if (pri.value && isExtremeV) {
+      const vGap = Math.abs(vSrc - hsvp.v);
+      if (vGap > 0.1) {
+        penalty += vGap * vGap * 35000;
+      }
+    }
+
     if (protectChroma && sSrc > 0.16) {
       if (hsvp.s < sSrc * 0.4) {
         penalty += (sSrc - hsvp.s) * 3200;
@@ -1055,6 +1191,13 @@ function nearestInPaletteConvert(r, g, b, palette) {
       const hueThreshold = pri.hue ? 0.04 : 0.08;
       if (hd > hueThreshold) {
         penalty += hd * hd * 18000 * hueWeight;
+      }
+    }
+
+    if (pri.hue && sSrc > 0.3) {
+      const satDrop = sSrc - hsvp.s;
+      if (satDrop > 0.15) {
+        penalty += satDrop * satDrop * 12000;
       }
     }
 
@@ -1115,7 +1258,7 @@ function undoDraw() {
   drawPixels = entry.pixels.map((row) => row.slice());
   drawObjects = entry.objects ? entry.objects.map(o => ({ ...o, relPixels: o.relPixels.map(p => p.slice()) })) : [];
   selectedObjIdx = -1;
-  objDragState = null;
+  objDragState = null; cornerResizeState = null;
   const dimsChanged = entry.cols !== drawGridCols || entry.rows !== drawGridRows;
   if (dimsChanged) {
     drawGridCols = entry.cols;
@@ -1142,7 +1285,7 @@ function redoDraw() {
   drawPixels = entry.pixels.map((row) => row.slice());
   drawObjects = entry.objects ? entry.objects.map(o => ({ ...o, relPixels: o.relPixels.map(p => p.slice()) })) : [];
   selectedObjIdx = -1;
-  objDragState = null;
+  objDragState = null; cornerResizeState = null;
   const dimsChanged = entry.cols !== drawGridCols || entry.rows !== drawGridRows;
   if (dimsChanged) {
     drawGridCols = entry.cols;
@@ -1357,7 +1500,7 @@ function floodFill(startX, startY) {
 
 function placePixelText(originX, originY, raw) {
   const hex = colorPicker.value;
-  const s = String(raw).toUpperCase();
+  const s = String(raw);
   let cx = originX;
   for (let i = 0; i < s.length; i++) {
     const ch = s[i];
@@ -1454,12 +1597,50 @@ function hitTestObject(obj, gx, gy) {
 }
 
 function rotateObject(obj) {
-  const b1 = getObjectBounds(obj);
-  const cx1 = b1.x + (b1.w - 1) / 2;
-  const cy1 = b1.y + (b1.h - 1) / 2;
+  if (obj._cx2 == null) {
+    obj._cx2 = 2 * obj.ox + obj.boundW - 1;
+    obj._cy2 = 2 * obj.oy + obj.boundH - 1;
+  }
+
+  if (obj.type === "rect" || obj.type === "ellipse") {
+    const newW = obj.boundH;
+    const newH = obj.boundW;
+    const hex = obj.relPixels.length > 0 ? obj.relPixels[0][2] : "#000000";
+    const pixels = obj.type === "rect"
+      ? rebuildRectPixels(newW, newH, hex)
+      : rebuildEllipsePixels(newW, newH, hex);
+    if (pixels.length === 0) return;
+    obj.relPixels = pixels;
+    obj.rotation = 0;
+    obj.boundW = newW;
+    obj.boundH = newH;
+    obj.ox = (obj._cx2 - newW + 1) >> 1;
+    obj.oy = (obj._cy2 - newH + 1) >> 1;
+    return;
+  }
+
+  if (obj.type === "text" && obj.textStr) {
+    const hex = obj.relPixels.length > 0 ? obj.relPixels[0][2] : "#000000";
+    const deg = ((obj._textRotDeg || 0) + 45) % 360;
+    obj._textRotDeg = deg;
+    let basePx = buildScaledTextRelPixels(obj.textStr, obj.textScale || 1, hex);
+    if (basePx.length === 0) return;
+    const rotPx = rotatePixels(basePx, deg);
+    let maxRx = 0, maxRy = 0;
+    for (const [rx, ry] of rotPx) {
+      if (rx > maxRx) maxRx = rx;
+      if (ry > maxRy) maxRy = ry;
+    }
+    obj.relPixels = rotPx;
+    obj.boundW = maxRx + 1;
+    obj.boundH = maxRy + 1;
+    obj.rotation = 0;
+    obj.ox = (obj._cx2 - obj.boundW + 1) >> 1;
+    obj.oy = (obj._cy2 - obj.boundH + 1) >> 1;
+    return;
+  }
 
   obj.rotation = (obj.rotation + 45) % 360;
-
   const rotPx = getRotatedRelPixels(obj);
   if (rotPx.length === 0) return;
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -1469,10 +1650,296 @@ function rotateObject(obj) {
     minY = Math.min(minY, ry);
     maxY = Math.max(maxY, ry);
   }
-  const newCenterRx = (minX + maxX) / 2;
-  const newCenterRy = (minY + maxY) / 2;
-  obj.ox = Math.round(cx1 - newCenterRx);
-  obj.oy = Math.round(cy1 - newCenterRy);
+  obj.relPixels = rotPx.map(([rx, ry, hex]) => [rx - minX, ry - minY, hex]);
+  obj.boundW = maxX - minX + 1;
+  obj.boundH = maxY - minY + 1;
+  obj.rotation = 0;
+  obj.ox = (obj._cx2 - obj.boundW + 1) >> 1;
+  obj.oy = (obj._cy2 - obj.boundH + 1) >> 1;
+}
+
+function rebuildRectPixels(w, h, hex) {
+  const pixels = [];
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (y === 0 || y === h - 1 || x === 0 || x === w - 1) {
+        pixels.push([x, y, hex]);
+      }
+    }
+  }
+  return pixels;
+}
+
+function rebuildEllipsePixels(w, h, hex) {
+  const pixels = [];
+  if (w <= 0 || h <= 0) return pixels;
+  if (w === 1 && h === 1) { pixels.push([0, 0, hex]); return pixels; }
+  const cx2 = (w - 1) / 2;
+  const cy2 = (h - 1) / 2;
+  const rx = w / 2;
+  const ry = h / 2;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const dx = (x + 0.5 - cx2) / rx;
+      const dy = (y + 0.5 - cy2) / ry;
+      const d = dx * dx + dy * dy;
+      if (d > 1) continue;
+      const isEdge =
+        ((x - 1 < 0)  || ((((x - 1 + 0.5 - cx2) / rx) ** 2 + dy * dy) > 1)) ||
+        ((x + 1 >= w)  || ((((x + 1 + 0.5 - cx2) / rx) ** 2 + dy * dy) > 1)) ||
+        ((y - 1 < 0)  || (((dx * dx) + (((y - 1 + 0.5 - cy2) / ry) ** 2)) > 1)) ||
+        ((y + 1 >= h)  || (((dx * dx) + (((y + 1 + 0.5 - cy2) / ry) ** 2)) > 1));
+      if (isEdge) pixels.push([x, y, hex]);
+    }
+  }
+  return pixels;
+}
+
+function hitCornerHandle(clientX, clientY) {
+  if (selectedObjIdx < 0) return null;
+  const obj = drawObjects[selectedObjIdx];
+  const b = getObjectBounds(obj);
+  const ps = drawPixelSize;
+  const bx = b.x * ps - 1, by = b.y * ps - 1, bw = b.w * ps + 2, bh = b.h * ps + 2;
+  const corners = [
+    { cx: bx, cy: by, anchor: "tl" },
+    { cx: bx + bw, cy: by, anchor: "tr" },
+    { cx: bx, cy: by + bh, anchor: "bl" },
+    { cx: bx + bw, cy: by + bh, anchor: "br" },
+  ];
+  const rect = drawCanvas.getBoundingClientRect();
+  const scaleX = drawCanvas.width / (rect.width || 1);
+  const scaleY = drawCanvas.height / (rect.height || 1);
+  const mx = (clientX - rect.left) * scaleX;
+  const my = (clientY - rect.top) * scaleY;
+  const hitR = Math.max(8, ps * 0.7);
+  for (const c of corners) {
+    const dx = mx - c.cx, dy = my - c.cy;
+    if (dx * dx + dy * dy <= hitR * hitR) return c.anchor;
+  }
+  return null;
+}
+
+function applyCornerResize(obj, anchor, startBounds, newGx, newGy) {
+  let { x: ox, y: oy, w, h } = startBounds;
+  if (anchor === "br") {
+    w = Math.max(1, newGx - ox + 1);
+    h = Math.max(1, newGy - oy + 1);
+  } else if (anchor === "bl") {
+    const right = ox + w - 1;
+    ox = Math.min(right, newGx);
+    w = right - ox + 1;
+    h = Math.max(1, newGy - oy + 1);
+  } else if (anchor === "tr") {
+    const bottom = oy + h - 1;
+    w = Math.max(1, newGx - ox + 1);
+    oy = Math.min(bottom, newGy);
+    h = bottom - oy + 1;
+  } else {
+    const right = ox + w - 1;
+    const bottom = oy + h - 1;
+    ox = Math.min(right, newGx);
+    oy = Math.min(bottom, newGy);
+    w = right - ox + 1;
+    h = bottom - oy + 1;
+  }
+  const hex = obj.relPixels.length > 0 ? obj.relPixels[0][2] : "#000000";
+  let pixels;
+  if (obj.type === "rect") {
+    pixels = rebuildRectPixels(w, h, hex);
+  } else if (obj.type === "ellipse") {
+    pixels = rebuildEllipsePixels(w, h, hex);
+  } else if (obj.type === "text" && obj.textStr) {
+    const baseScale = obj.textScale || 1;
+    const ratio = Math.max(w / (startBounds.w || 1), h / (startBounds.h || 1));
+    const newScale = Math.max(1, Math.round(baseScale * ratio));
+    pixels = buildScaledTextRelPixels(obj.textStr, newScale, hex);
+    if (pixels.length === 0) return;
+    const deg = obj._textRotDeg || 0;
+    if (deg !== 0) pixels = rotatePixels(pixels, deg);
+    obj.textScale = newScale;
+    let maxRx = 0, maxRy = 0;
+    for (const [rx, ry] of pixels) {
+      if (rx > maxRx) maxRx = rx;
+      if (ry > maxRy) maxRy = ry;
+    }
+    obj.relPixels = pixels;
+    obj.ox = ox;
+    obj.oy = oy;
+    obj.rotation = 0;
+    obj.boundW = maxRx + 1;
+    obj.boundH = maxRy + 1;
+    return;
+  } else {
+    const sx = w / (startBounds.w || 1);
+    const sy = h / (startBounds.h || 1);
+    pixels = [];
+    const seen = new Set();
+    for (const [rx, ry, c] of obj.relPixels) {
+      const nx = Math.round(rx * sx);
+      const ny = Math.round(ry * sy);
+      const key = nx * 100000 + ny;
+      if (!seen.has(key)) { seen.add(key); pixels.push([nx, ny, c]); }
+    }
+  }
+  if (pixels.length === 0) return;
+  obj.relPixels = pixels;
+  obj.ox = ox;
+  obj.oy = oy;
+  obj.rotation = 0;
+  obj.boundW = w;
+  obj.boundH = h;
+}
+
+function rotatePixels(basePx, deg) {
+  if (deg === 0) return basePx;
+  let bMaxX = 0, bMaxY = 0;
+  for (const [rx, ry] of basePx) {
+    if (rx > bMaxX) bMaxX = rx;
+    if (ry > bMaxY) bMaxY = ry;
+  }
+  let rotPx;
+  if (deg === 90) {
+    rotPx = basePx.map(([rx, ry, c]) => [bMaxY - ry, rx, c]);
+  } else if (deg === 180) {
+    rotPx = basePx.map(([rx, ry, c]) => [bMaxX - rx, bMaxY - ry, c]);
+  } else if (deg === 270) {
+    rotPx = basePx.map(([rx, ry, c]) => [ry, bMaxX - rx, c]);
+  } else {
+    const cx = bMaxX / 2, cy = bMaxY / 2;
+    const angle = deg * Math.PI / 180;
+    const cosA = Math.cos(angle), sinA = Math.sin(angle);
+    const seen = new Set();
+    rotPx = [];
+    for (const [rx, ry, c] of basePx) {
+      const dx = rx - cx, dy = ry - cy;
+      const nx = Math.round(dx * cosA - dy * sinA + cx);
+      const ny = Math.round(dx * sinA + dy * cosA + cy);
+      const key = (nx << 16) | (ny & 0xffff);
+      if (!seen.has(key)) { seen.add(key); rotPx.push([nx, ny, c]); }
+    }
+  }
+  let minX = Infinity, minY = Infinity;
+  for (const [rx, ry] of rotPx) {
+    if (rx < minX) minX = rx;
+    if (ry < minY) minY = ry;
+  }
+  if (minX !== 0 || minY !== 0) {
+    rotPx = rotPx.map(([rx, ry, c]) => [rx - minX, ry - minY, c]);
+  }
+  return rotPx;
+}
+
+function scaleObject(obj, factor) {
+  obj._cx2 = null;
+  const b1 = getObjectBounds(obj);
+  const absCx = b1.x + (b1.w - 1) / 2;
+  const absCy = b1.y + (b1.h - 1) / 2;
+
+  if (obj.type === "rect" || obj.type === "ellipse") {
+    const step = factor > 1 ? 2 : -2;
+    const newW = Math.max(1, obj.boundW + step);
+    const newH = Math.max(1, obj.boundH + step);
+    if (newW === obj.boundW && newH === obj.boundH) return;
+    const hex = obj.relPixels.length > 0 ? obj.relPixels[0][2] : "#000000";
+    const pixels = obj.type === "rect"
+      ? rebuildRectPixels(newW, newH, hex)
+      : rebuildEllipsePixels(newW, newH, hex);
+    if (pixels.length === 0) return;
+    obj.relPixels = pixels;
+    obj.rotation = 0;
+    obj.boundW = newW;
+    obj.boundH = newH;
+    const newAbsCx = obj.ox + (newW - 1) / 2;
+    const newAbsCy = obj.oy + (newH - 1) / 2;
+    obj.ox += Math.round(absCx - newAbsCx);
+    obj.oy += Math.round(absCy - newAbsCy);
+    return;
+  }
+
+  if (obj.type === "text" && obj.textStr) {
+    const step = factor > 1 ? 1 : -1;
+    const newScale = Math.max(1, (obj.textScale || 1) + step);
+    if (newScale === (obj.textScale || 1)) return;
+    const hex = obj.relPixels.length > 0 ? obj.relPixels[0][2] : "#000000";
+    let newPixels = buildScaledTextRelPixels(obj.textStr, newScale, hex);
+    if (newPixels.length === 0) return;
+    const deg = obj._textRotDeg || 0;
+    if (deg !== 0) newPixels = rotatePixels(newPixels, deg);
+    obj.textScale = newScale;
+    obj.relPixels = newPixels;
+    obj.rotation = 0;
+    let maxRx = 0, maxRy = 0;
+    for (const [rx, ry] of newPixels) {
+      if (rx > maxRx) maxRx = rx;
+      if (ry > maxRy) maxRy = ry;
+    }
+    obj.boundW = maxRx + 1;
+    obj.boundH = maxRy + 1;
+    const newAbsCx = obj.ox + (obj.boundW - 1) / 2;
+    const newAbsCy = obj.oy + (obj.boundH - 1) / 2;
+    obj.ox += Math.round(absCx - newAbsCx);
+    obj.oy += Math.round(absCy - newAbsCy);
+    return;
+  }
+
+  const oldPixels = obj.relPixels;
+  let minRx = Infinity, maxRx = -Infinity, minRy = Infinity, maxRy = -Infinity;
+  for (const [rx, ry] of oldPixels) {
+    minRx = Math.min(minRx, rx); maxRx = Math.max(maxRx, rx);
+    minRy = Math.min(minRy, ry); maxRy = Math.max(maxRy, ry);
+  }
+  const relCx = (minRx + maxRx) / 2;
+  const relCy = (minRy + maxRy) / 2;
+
+  const newPixels = [];
+  const seen = new Set();
+  for (const [rx, ry, hex] of oldPixels) {
+    const nx = Math.round((rx - relCx) * factor + relCx);
+    const ny = Math.round((ry - relCy) * factor + relCy);
+    const key = (nx + 10000) * 100000 + (ny + 10000);
+    if (!seen.has(key)) {
+      seen.add(key);
+      newPixels.push([nx, ny, hex]);
+    }
+  }
+  if (newPixels.length === 0) return;
+
+  if (factor > 1) {
+    const fillSeen = new Set(newPixels.map(([x,y]) => (x+10000)*100000+(y+10000)));
+    for (const [rx, ry, hex] of oldPixels) {
+      const nx0 = (rx - relCx) * factor + relCx;
+      const ny0 = (ry - relCy) * factor + relCy;
+      const x0 = Math.floor(nx0), x1 = Math.ceil(nx0);
+      const y0 = Math.floor(ny0), y1 = Math.ceil(ny0);
+      for (let fy = y0; fy <= y1; fy++) {
+        for (let fx = x0; fx <= x1; fx++) {
+          const fk = (fx+10000)*100000+(fy+10000);
+          if (!fillSeen.has(fk)) {
+            fillSeen.add(fk);
+            newPixels.push([fx, fy, hex]);
+          }
+        }
+      }
+    }
+  }
+
+  let nMinRx = Infinity, nMaxRx = -Infinity, nMinRy = Infinity, nMaxRy = -Infinity;
+  for (const [rx, ry] of newPixels) {
+    nMinRx = Math.min(nMinRx, rx); nMaxRx = Math.max(nMaxRx, rx);
+    nMinRy = Math.min(nMinRy, ry); nMaxRy = Math.max(nMaxRy, ry);
+  }
+  const shifted = newPixels.map(([rx, ry, hex]) => [rx - nMinRx, ry - nMinRy, hex]);
+
+  obj.relPixels = shifted;
+  obj.boundW = nMaxRx - nMinRx + 1;
+  obj.boundH = nMaxRy - nMinRy + 1;
+
+  const newB = getObjectBounds(obj);
+  const newAbsCx = obj.ox + (newB.w - 1) / 2;
+  const newAbsCy = obj.oy + (newB.h - 1) / 2;
+  obj.ox += Math.round(absCx - newAbsCx);
+  obj.oy += Math.round(absCy - newAbsCy);
 }
 
 function commitObject(idx) {
@@ -1518,14 +1985,15 @@ function renderObjects(ctx) {
     }
     if (i === selectedObjIdx) {
       const b = getObjectBounds(obj);
+      const bx = b.x * ps - 1, by = b.y * ps - 1, bw = b.w * ps + 2, bh = b.h * ps + 2;
       ctx.save();
       ctx.strokeStyle = "rgba(50,130,246,0.85)";
       ctx.lineWidth = 2;
       ctx.setLineDash([4, 3]);
-      ctx.strokeRect(b.x * ps - 1, b.y * ps - 1, b.w * ps + 2, b.h * ps + 2);
+      ctx.strokeRect(bx, by, bw, bh);
       ctx.setLineDash([]);
       ctx.fillStyle = "rgba(50,130,246,0.15)";
-      ctx.fillRect(b.x * ps - 1, b.y * ps - 1, b.w * ps + 2, b.h * ps + 2);
+      ctx.fillRect(bx, by, bw, bh);
       ctx.restore();
     }
   }
@@ -1580,7 +2048,7 @@ function buildEllipseRelPixels(ax, ay, bx, by) {
 
 function buildTextRelPixels(originX, originY, raw) {
   const hex = colorPicker.value;
-  const s = String(raw).toUpperCase();
+  const s = String(raw);
   const pixels = [];
   let cx = 0;
   for (let i = 0; i < s.length; i++) {
@@ -1600,6 +2068,33 @@ function buildTextRelPixels(originX, originY, raw) {
     cx += gw + 1;
   }
   return { pixels, ox: originX, oy: originY };
+}
+
+function buildScaledTextRelPixels(raw, scale, hex) {
+  const s = String(raw);
+  const pixels = [];
+  let cx = 0;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (ch === " ") { cx += 2 * scale; continue; }
+    const rows = PIXEL_GLYPH[ch] || PIXEL_GLYPH["?"];
+    if (!rows.length) { cx += 2 * scale; continue; }
+    const gw = rows[0].length;
+    const gh = rows.length;
+    for (let r = 0; r < gh; r++) {
+      const row = rows[r];
+      for (let c = 0; c < row.length; c++) {
+        if (row[c] !== "1") continue;
+        for (let dy = 0; dy < scale; dy++) {
+          for (let dx = 0; dx < scale; dx++) {
+            pixels.push([cx + c * scale + dx, r * scale + dy, hex]);
+          }
+        }
+      }
+    }
+    cx += (gw + 1) * scale;
+  }
+  return pixels;
 }
 
 function drawShapePreview(ctx) {
@@ -1696,10 +2191,59 @@ function applyPickerSize(sz) {
   applyPickerLayoutRect(n, n, hw, 6);
 }
 
+function eraseFromObjects(gx, gy) {
+  for (let i = drawObjects.length - 1; i >= 0; i--) {
+    const obj = drawObjects[i];
+    const rotated = getRotatedRelPixels(obj);
+    let hit = false;
+    const kept = [];
+    for (const [rx, ry, hex] of rotated) {
+      if (obj.ox + rx === gx && obj.oy + ry === gy) {
+        hit = true;
+      } else {
+        kept.push([rx, ry, hex]);
+      }
+    }
+    if (!hit) continue;
+    if (kept.length === 0) {
+      drawObjects.splice(i, 1);
+      if (selectedObjIdx === i) selectedObjIdx = -1;
+      else if (selectedObjIdx > i) selectedObjIdx--;
+    } else {
+      let minRx = Infinity, minRy = Infinity;
+      for (const [rx, ry] of kept) {
+        if (rx < minRx) minRx = rx;
+        if (ry < minRy) minRy = ry;
+      }
+      obj.relPixels = kept.map(([rx, ry, c]) => [rx - minRx, ry - minRy, c]);
+      obj.ox += minRx;
+      obj.oy += minRy;
+      obj.rotation = 0;
+      let maxRx = 0, maxRy = 0;
+      for (const [rx, ry] of obj.relPixels) {
+        if (rx > maxRx) maxRx = rx;
+        if (ry > maxRy) maxRy = ry;
+      }
+      obj.boundW = maxRx + 1;
+      obj.boundH = maxRy + 1;
+      obj._cx2 = null;
+      obj.type = "custom";
+      obj.textStr = null;
+      obj._textRotDeg = 0;
+    }
+    return;
+  }
+}
+
 function paintAt(clientX, clientY) {
   const { x, y } = clientToDrawCell(clientX, clientY);
   if (x < 0 || y < 0 || x >= drawGridCols || y >= drawGridRows) return;
-  drawPixels[y][x] = drawingMode === "eraser" ? "#ffffff" : colorPicker.value;
+  if (drawingMode === "eraser") {
+    drawPixels[y][x] = "#ffffff";
+    eraseFromObjects(x, y);
+  } else {
+    drawPixels[y][x] = colorPicker.value;
+  }
   if (isDrawing) {
     scheduleDrawDrawCanvas();
   } else {
@@ -1758,6 +2302,18 @@ drawCanvas.addEventListener("mousedown", (e) => {
     return;
   }
   if (drawingMode === "select") {
+    const corner = hitCornerHandle(e.clientX, e.clientY);
+    if (corner && selectedObjIdx >= 0) {
+      const obj = drawObjects[selectedObjIdx];
+      cornerResizeState = {
+        anchor: corner,
+        startBounds: { ...getObjectBounds(obj) },
+        origPixels: obj.relPixels.map(p => [...p]),
+        origW: obj.boundW, origH: obj.boundH, origOx: obj.ox, origOy: obj.oy,
+        origTextScale: obj.textScale || 1,
+      };
+      return;
+    }
     const { x, y } = clientToDrawCell(e.clientX, e.clientY);
     let hitIdx = -1;
     for (let i = drawObjects.length - 1; i >= 0; i--) {
@@ -1782,13 +2338,15 @@ drawCanvas.addEventListener("mousedown", (e) => {
   if (drawingMode === "text") {
     const { x, y } = clientToDrawCell(e.clientX, e.clientY);
     if (x < 0 || y < 0 || x >= drawGridCols || y >= drawGridRows) return;
-    const raw = window.prompt("输入文字（英文/数字，5×7 像素字）", "");
+    const raw = window.prompt("输入文字（大小写英文/数字/符号，5×7 像素字）", "");
     if (raw === null) return;
     const t = raw.trim();
     if (!t) return;
     const built = buildTextRelPixels(x, y, t);
     if (built.pixels.length > 0) {
       const obj = createObjectFromPixels("text", built.pixels, built.ox, built.oy);
+      obj.textStr = t;
+      obj.textScale = 1;
       drawObjects.push(obj);
       selectedObjIdx = drawObjects.length - 1;
       setMode("select");
@@ -1823,6 +2381,10 @@ drawCanvas.addEventListener("mousedown", (e) => {
   paintAt(e.clientX, e.clientY);
 });
 window.addEventListener("pointerup", (e) => {
+  if (cornerResizeState) {
+    cornerResizeState = null;
+    return;
+  }
   if (objDragState) {
     objDragState = null;
     return;
@@ -1839,6 +2401,7 @@ window.addEventListener("pointerup", (e) => {
   drawDrawCanvas();
 });
 window.addEventListener("pointercancel", (e) => {
+  if (cornerResizeState) { cornerResizeState = null; return; }
   if (objDragState) { objDragState = null; return; }
   if (shapeDrag) {
     finishShapeDrag(e.clientX, e.clientY, e.shiftKey);
@@ -1852,12 +2415,27 @@ window.addEventListener("pointercancel", (e) => {
   drawDrawCanvas();
 });
 drawCanvas.addEventListener("mousemove", (e) => {
+  if (cornerResizeState && selectedObjIdx >= 0) {
+    const { x, y } = clientToDrawCell(e.clientX, e.clientY);
+    const obj = drawObjects[selectedObjIdx];
+    obj.relPixels = cornerResizeState.origPixels.map(p => [...p]);
+    obj.boundW = cornerResizeState.origW;
+    obj.boundH = cornerResizeState.origH;
+    obj.ox = cornerResizeState.origOx;
+    obj.oy = cornerResizeState.origOy;
+    if (obj.type === "text") obj.textScale = cornerResizeState.origTextScale;
+    applyCornerResize(obj, cornerResizeState.anchor, cornerResizeState.startBounds, x, y);
+    obj._cx2 = null;
+    scheduleDrawDrawCanvas();
+    return;
+  }
   if (objDragState && selectedObjIdx >= 0) {
     const { x, y } = clientToDrawCell(e.clientX, e.clientY);
     const dx = x - objDragState.startGx;
     const dy = y - objDragState.startGy;
     drawObjects[selectedObjIdx].ox = objDragState.origOx + dx;
     drawObjects[selectedObjIdx].oy = objDragState.origOy + dy;
+    drawObjects[selectedObjIdx]._cx2 = null;
     scheduleDrawDrawCanvas();
     return;
   }
@@ -1869,7 +2447,12 @@ drawCanvas.addEventListener("mousemove", (e) => {
     scheduleDrawDrawCanvas();
     return;
   }
-  if (drawingMode === "eyedropper" || drawingMode === "pan" || drawingMode === "select") return;
+  if (drawingMode === "select") {
+    const corner = hitCornerHandle(e.clientX, e.clientY);
+    drawCanvas.style.cursor = corner ? (corner === "tl" || corner === "br" ? "nwse-resize" : "nesw-resize") : "";
+    return;
+  }
+  if (drawingMode === "eyedropper" || drawingMode === "pan") return;
   if (isDrawing) {
     paintAt(e.clientX, e.clientY);
   }
@@ -1883,6 +2466,19 @@ drawCanvas.addEventListener("touchstart", (e) => {
     return;
   }
   if (drawingMode === "select") {
+    const corner = hitCornerHandle(t.clientX, t.clientY);
+    if (corner && selectedObjIdx >= 0) {
+      const obj = drawObjects[selectedObjIdx];
+      cornerResizeState = {
+        anchor: corner,
+        startBounds: { ...getObjectBounds(obj) },
+        origPixels: obj.relPixels.map(p => [...p]),
+        origW: obj.boundW, origH: obj.boundH, origOx: obj.ox, origOy: obj.oy,
+        origTextScale: obj.textScale || 1,
+      };
+      e.preventDefault();
+      return;
+    }
     const { x, y } = clientToDrawCell(t.clientX, t.clientY);
     let hitIdx = -1;
     for (let i = drawObjects.length - 1; i >= 0; i--) {
@@ -1915,13 +2511,15 @@ drawCanvas.addEventListener("touchstart", (e) => {
   if (drawingMode === "text") {
     const { x, y } = clientToDrawCell(t.clientX, t.clientY);
     if (x < 0 || y < 0 || x >= drawGridCols || y >= drawGridRows) return;
-    const raw = window.prompt("输入文字（英文/数字，5×7 像素字）", "");
+    const raw = window.prompt("输入文字（大小写英文/数字/符号，5×7 像素字）", "");
     if (raw === null) return;
     const str = raw.trim();
     if (!str) return;
     const built = buildTextRelPixels(x, y, str);
     if (built.pixels.length > 0) {
       const obj = createObjectFromPixels("text", built.pixels, built.ox, built.oy);
+      obj.textStr = str;
+      obj.textScale = 1;
       drawObjects.push(obj);
       selectedObjIdx = drawObjects.length - 1;
       setMode("select");
@@ -1951,6 +2549,23 @@ drawCanvas.addEventListener("touchstart", (e) => {
   e.preventDefault();
 });
 drawCanvas.addEventListener("touchmove", (e) => {
+  if (cornerResizeState && selectedObjIdx >= 0) {
+    const t = e.touches[0];
+    if (!t) return;
+    const { x, y } = clientToDrawCell(t.clientX, t.clientY);
+    const obj = drawObjects[selectedObjIdx];
+    obj.relPixels = cornerResizeState.origPixels.map(p => [...p]);
+    obj.boundW = cornerResizeState.origW;
+    obj.boundH = cornerResizeState.origH;
+    obj.ox = cornerResizeState.origOx;
+    obj.oy = cornerResizeState.origOy;
+    if (obj.type === "text") obj.textScale = cornerResizeState.origTextScale;
+    applyCornerResize(obj, cornerResizeState.anchor, cornerResizeState.startBounds, x, y);
+    obj._cx2 = null;
+    scheduleDrawDrawCanvas();
+    e.preventDefault();
+    return;
+  }
   if (objDragState && selectedObjIdx >= 0) {
     const t = e.touches[0];
     if (!t) return;
@@ -1959,6 +2574,7 @@ drawCanvas.addEventListener("touchmove", (e) => {
     const dy = y - objDragState.startGy;
     drawObjects[selectedObjIdx].ox = objDragState.origOx + dx;
     drawObjects[selectedObjIdx].oy = objDragState.origOy + dy;
+    drawObjects[selectedObjIdx]._cx2 = null;
     scheduleDrawDrawCanvas();
     e.preventDefault();
     return;
@@ -1981,6 +2597,8 @@ drawCanvas.addEventListener("touchmove", (e) => {
   e.preventDefault();
 });
 drawCanvas.addEventListener("touchend", (e) => {
+  if (cornerResizeState) { cornerResizeState = null; e.preventDefault(); return; }
+  if (objDragState) { objDragState = null; e.preventDefault(); return; }
   if (shapeDrag && e.changedTouches[0]) {
     const t = e.changedTouches[0];
     finishShapeDrag(t.clientX, t.clientY, t.shiftKey === true);
@@ -2003,6 +2621,7 @@ function setMode(nextMode) {
   }
   drawingMode = nextMode;
   if (selectBtn) selectBtn.classList.toggle("active", drawingMode === "select");
+  if (rotateObjBtn) rotateObjBtn.style.display = (drawingMode === "select") ? "" : "none";
   penBtn.classList.toggle("active", drawingMode === "pen");
   eraserBtn.classList.toggle("active", drawingMode === "eraser");
   if (textBtn) textBtn.classList.toggle("active", drawingMode === "text");
@@ -2015,7 +2634,7 @@ function setMode(nextMode) {
   drawCanvas.classList.toggle("draw-canvas--select", drawingMode === "select");
   drawCanvas.classList.toggle("draw-canvas--pan", drawingMode === "pan");
   if (nextMode !== "select") {
-    objDragState = null;
+    objDragState = null; cornerResizeState = null;
     if (selectedObjIdx >= 0) { selectedObjIdx = -1; drawDrawCanvas(); }
   }
   syncDrawViewportPanCursor();
@@ -2064,6 +2683,22 @@ window.addEventListener("keydown", (e) => {
       e.preventDefault();
       rotateObject(drawObjects[selectedObjIdx]);
       drawDrawCanvas();
+      return;
+    }
+    if ((e.code === "Equal" || e.code === "NumpadAdd") && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      scaleObject(drawObjects[selectedObjIdx], 2);
+      drawDrawCanvas();
+      return;
+    }
+    if ((e.code === "Minus" || e.code === "NumpadSubtract") && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      const obj = drawObjects[selectedObjIdx];
+      const b = getObjectBounds(obj);
+      if (b.w > 1 || b.h > 1) {
+        scaleObject(obj, 0.5);
+        drawDrawCanvas();
+      }
       return;
     }
     if (e.code === "Enter") {
@@ -2150,6 +2785,12 @@ function switchFeatureTab(tab) {
 }
 
 if (selectBtn) selectBtn.addEventListener("click", () => setMode("select"));
+if (rotateObjBtn) rotateObjBtn.addEventListener("click", () => {
+  if (selectedObjIdx >= 0) {
+    rotateObject(drawObjects[selectedObjIdx]);
+    drawDrawCanvas();
+  }
+});
 penBtn.addEventListener("click", () => setMode("pen"));
 eraserBtn.addEventListener("click", () => setMode("eraser"));
 if (textBtn) textBtn.addEventListener("click", () => setMode("text"));
@@ -2169,7 +2810,7 @@ clearBtn.addEventListener("click", () => {
   pushDrawUndo();
   drawObjects.length = 0;
   selectedObjIdx = -1;
-  objDragState = null;
+  objDragState = null; cornerResizeState = null;
   initDrawPixels();
   drawDrawCanvas();
 });
@@ -2420,7 +3061,7 @@ function sendConvertToDraw() {
   drawPixels = convertPixels.map((row) => row.slice());
   drawObjects.length = 0;
   selectedObjIdx = -1;
-  objDragState = null;
+  objDragState = null; cornerResizeState = null;
   drawUndoStack.length = 0;
   drawRedoStack.length = 0;
   updateUndoRedoButtons();
@@ -3185,6 +3826,31 @@ syncConvertColorExtractDisplay();
 if (convertColorExtractRange) {
   convertColorExtractRange.disabled = !convertSmartColorEl.checked;
 }
+function handleGridSizeInput(isWidth) {
+  const el = isWidth ? drawGridColsInput : drawGridRowsInput;
+  if (!el) return;
+  const val = parseInt(el.value, 10);
+  if (Number.isNaN(val) || val < 1 || val > GRID_MAX) {
+    updateDrawGridSizeLabel();
+    return;
+  }
+  const newCols = isWidth ? val : drawGridCols;
+  const newRows = isWidth ? drawGridRows : val;
+  applyCenterResize(newCols, newRows);
+}
+if (drawGridColsInput) {
+  drawGridColsInput.addEventListener("change", () => handleGridSizeInput(true));
+  drawGridColsInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.target.blur(); }
+  });
+}
+if (drawGridRowsInput) {
+  drawGridRowsInput.addEventListener("change", () => handleGridSizeInput(false));
+  drawGridRowsInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.target.blur(); }
+  });
+}
+
 updateDrawGridSizeLabel();
 drawDrawCanvas();
 drawConvertCanvas();

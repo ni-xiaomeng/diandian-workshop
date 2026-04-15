@@ -158,7 +158,8 @@
         <div class="mac-window__body">
           <div class="draw-layout">
             <div class="draw-sidebar">
-              <button id="selectBtn" type="button" class="draw-sidebar__btn" title="选择对象，拖拽移动，R旋转，Enter确认，Delete删除">选择</button>
+              <button id="selectBtn" type="button" class="draw-sidebar__btn" title="选择对象，拖拽移动，拽角缩放，Enter确认，Delete删除">选择</button>
+              <button id="rotateObjBtn" type="button" class="draw-sidebar__btn" style="display:none" title="旋转选中对象 45°（快捷键 R）">旋转</button>
               <button id="penBtn" type="button" class="draw-sidebar__btn active" title="画笔">画笔</button>
               <button id="eraserBtn" type="button" class="draw-sidebar__btn" title="橡皮">橡皮</button>
               <button id="eyedropperBtn" type="button" class="draw-sidebar__btn" title="吸色（E / I）">吸色</button>
@@ -181,7 +182,7 @@
               <button id="drawZoomReset" type="button" class="draw-sidebar__btn" title="重置 100%">1:1</button>
               <div class="draw-sidebar__divider"></div>
               <button id="exportDrawBtn" type="button" class="draw-sidebar__btn" title="导出 PNG">导出</button>
-              <span class="draw-sidebar__size" id="drawGridSizeLabel" aria-live="polite">32×32</span>
+              <div class="draw-sidebar__size" id="drawGridSizeLabel" aria-live="polite"><input id="drawGridColsInput" type="text" inputmode="numeric" pattern="[0-9]*" value="32" class="grid-size-input" title="宽度"><span class="grid-size-x">×</span><input id="drawGridRowsInput" type="text" inputmode="numeric" pattern="[0-9]*" value="32" class="grid-size-input" title="高度"></div>
             </div>
 
             <div class="draw-canvas-area">

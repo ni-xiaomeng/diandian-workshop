@@ -1085,6 +1085,57 @@ function mergeColorsToTarget(finalRgbs, targetMax) {
   });
 }
 
+/**
+ * 空间区域平滑：对相邻且颜色相近的像素做连通区域合并，统一为同一纯色。
+ * threshold 为 redmean 距离阈值。
+ */
+function flattenSimilarRegions(rgbGrid, cols, rows, threshold) {
+  const visited = new Uint8Array(cols * rows);
+  const result = rgbGrid.slice();
+  for (let startY = 0; startY < rows; startY++) {
+    for (let startX = 0; startX < cols; startX++) {
+      const idx0 = startY * cols + startX;
+      if (visited[idx0]) continue;
+      const [sr, sg, sb] = result[idx0];
+      const region = [idx0];
+      const colorCounts = new Map();
+      const key0 = (sr << 16) | (sg << 8) | sb;
+      colorCounts.set(key0, 1);
+      visited[idx0] = 1;
+      const queue = [startX, startY];
+      let qi = 0;
+      while (qi < queue.length) {
+        const cx = queue[qi++], cy = queue[qi++];
+        const neighbors = [[cx-1,cy],[cx+1,cy],[cx,cy-1],[cx,cy+1]];
+        for (const [nx, ny] of neighbors) {
+          if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue;
+          const ni = ny * cols + nx;
+          if (visited[ni]) continue;
+          const [nr, ng, nb] = result[ni];
+          if (redmeanColorDistance(sr, sg, sb, nr, ng, nb) < threshold) {
+            visited[ni] = 1;
+            region.push(ni);
+            const nk = (nr << 16) | (ng << 8) | nb;
+            colorCounts.set(nk, (colorCounts.get(nk) || 0) + 1);
+            queue.push(nx, ny);
+          }
+        }
+      }
+      let bestKey = key0, bestCnt = 0;
+      for (const [k, cnt] of colorCounts) {
+        if (cnt > bestCnt) { bestCnt = cnt; bestKey = k; }
+      }
+      const fr = (bestKey >> 16) & 255;
+      const fg = (bestKey >> 8) & 255;
+      const fb = bestKey & 255;
+      for (const ri of region) {
+        result[ri] = [fr, fg, fb];
+      }
+    }
+  }
+  return result;
+}
+
 function redmeanColorDistance(r1, g1, b1, r2, g2, b2) {
   const r = (r1 + r2) / 2;
   const dr = r1 - r2;
@@ -3328,6 +3379,7 @@ function convertImageToPixels() {
         nearestInPaletteConvert(r, g, b, palette)
       );
       finalRgbs = mergeColorsToTarget(finalRgbs, targetColors);
+      finalRgbs = flattenSimilarRegions(finalRgbs, cols, rows, 500);
     }
     if (myGen !== convertJobGen) return;
     convertPixels = [];

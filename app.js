@@ -2235,8 +2235,9 @@ function eraseFromObjects(gx, gy) {
   }
 }
 
-function paintAt(clientX, clientY) {
-  const { x, y } = clientToDrawCell(clientX, clientY);
+let lastPaintCell = null;
+
+function paintCell(x, y) {
   if (x < 0 || y < 0 || x >= drawGridCols || y >= drawGridRows) return;
   if (drawingMode === "eraser") {
     drawPixels[y][x] = "#ffffff";
@@ -2244,6 +2245,30 @@ function paintAt(clientX, clientY) {
   } else {
     drawPixels[y][x] = colorPicker.value;
   }
+}
+
+function plotLine(x0, y0, x1, y1) {
+  let dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
+  let sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+  let err = dx - dy;
+  while (true) {
+    paintCell(x0, y0);
+    if (x0 === x1 && y0 === y1) break;
+    let e2 = 2 * err;
+    if (e2 > -dy) { err -= dy; x0 += sx; }
+    if (e2 < dx) { err += dx; y0 += sy; }
+  }
+}
+
+function paintAt(clientX, clientY) {
+  const { x, y } = clientToDrawCell(clientX, clientY);
+  if (x < 0 || y < 0 || x >= drawGridCols || y >= drawGridRows) return;
+  if (lastPaintCell) {
+    plotLine(lastPaintCell.x, lastPaintCell.y, x, y);
+  } else {
+    paintCell(x, y);
+  }
+  lastPaintCell = { x, y };
   if (isDrawing) {
     scheduleDrawDrawCanvas();
   } else {
@@ -2378,6 +2403,7 @@ drawCanvas.addEventListener("mousedown", (e) => {
   }
   pushDrawUndo();
   isDrawing = true;
+  lastPaintCell = null;
   paintAt(e.clientX, e.clientY);
 });
 window.addEventListener("pointerup", (e) => {
@@ -2394,6 +2420,7 @@ window.addEventListener("pointerup", (e) => {
     return;
   }
   isDrawing = false;
+  lastPaintCell = null;
   if (drawCanvasRaf != null) {
     cancelAnimationFrame(drawCanvasRaf);
     drawCanvasRaf = null;
@@ -2408,6 +2435,7 @@ window.addEventListener("pointercancel", (e) => {
     return;
   }
   isDrawing = false;
+  lastPaintCell = null;
   if (drawCanvasRaf != null) {
     cancelAnimationFrame(drawCanvasRaf);
     drawCanvasRaf = null;
@@ -2545,6 +2573,7 @@ drawCanvas.addEventListener("touchstart", (e) => {
   }
   pushDrawUndo();
   isDrawing = true;
+  lastPaintCell = null;
   paintAt(t.clientX, t.clientY);
   e.preventDefault();
 });
@@ -2606,6 +2635,7 @@ drawCanvas.addEventListener("touchend", (e) => {
     return;
   }
   isDrawing = false;
+  lastPaintCell = null;
   if (drawCanvasRaf != null) {
     cancelAnimationFrame(drawCanvasRaf);
     drawCanvasRaf = null;

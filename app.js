@@ -2883,9 +2883,51 @@ if (drawZoomViewport) {
   );
 }
 
+function exportHighResDataURL(pixels, cols, rows, objects) {
+  const EXPORT_PX = Math.max(4, Math.min(40, Math.floor(2048 / Math.max(cols, rows))));
+  const w = cols * EXPORT_PX;
+  const h = rows * EXPORT_PX;
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  const cx = c.getContext("2d");
+  const img = cx.createImageData(w, h);
+  const d = img.data;
+  for (let y = 0; y < rows; y++) {
+    const y0 = y * EXPORT_PX;
+    for (let x = 0; x < cols; x++) {
+      const hex = normalizeHex(pixels[y][x]);
+      const r = parseInt(hex.slice(1, 3), 16);
+      const g = parseInt(hex.slice(3, 5), 16);
+      const b = parseInt(hex.slice(5, 7), 16);
+      const x0 = x * EXPORT_PX;
+      for (let dy = 0; dy < EXPORT_PX; dy++) {
+        let di = ((y0 + dy) * w + x0) * 4;
+        for (let dx = 0; dx < EXPORT_PX; dx++) {
+          d[di] = r; d[di+1] = g; d[di+2] = b; d[di+3] = 255;
+          di += 4;
+        }
+      }
+    }
+  }
+  cx.putImageData(img, 0, 0);
+  if (objects && objects.length) {
+    for (const obj of objects) {
+      const absPx = getObjectAbsolutePixels(obj);
+      for (const [ax, ay, hex] of absPx) {
+        if (ax >= 0 && ay >= 0 && ax < cols && ay < rows) {
+          cx.fillStyle = hex;
+          cx.fillRect(ax * EXPORT_PX, ay * EXPORT_PX, EXPORT_PX, EXPORT_PX);
+        }
+      }
+    }
+  }
+  return c.toDataURL("image/png");
+}
+
 exportDrawBtn.addEventListener("click", () => {
   const a = document.createElement("a");
-  a.href = drawCanvas.toDataURL("image/png");
+  a.href = exportHighResDataURL(drawPixels, drawGridCols, drawGridRows, drawObjects);
   a.download = `pixel-draw-${drawGridCols}x${drawGridRows}-${Date.now()}.png`;
   a.click();
 });
@@ -3042,7 +3084,7 @@ showConvertOriginalEl.addEventListener("change", () => {
 
 exportConvertBtn.addEventListener("click", () => {
   const a = document.createElement("a");
-  a.href = convertCanvas.toDataURL("image/png");
+  a.href = exportHighResDataURL(convertPixels, convertGridCols, convertGridRows, null);
   a.download = `pixel-convert-${convertGridCols}x${convertGridRows}-${Date.now()}.png`;
   a.click();
 });
@@ -3444,18 +3486,18 @@ function renderSbHuePicker() {
   const hh1 = Math.max(1, hhgt - 1);
   ensureHueStripCached();
   hueCtx.putImageData(hueStripCacheImg, 0, 0);
-  const hy = (pickerHue / 360) * hh1;
-  const ax = Math.min(6, Math.max(3, hw - 2));
-  hueCtx.fillStyle = "#fff";
-  hueCtx.strokeStyle = "#000";
-  hueCtx.lineWidth = 1;
+  const hy = Math.round((pickerHue / 360) * hh1);
+  const triW = Math.max(6, Math.round(hw * 0.32));
+  const triH = Math.round(triW * 0.9);
+  hueCtx.save();
   hueCtx.beginPath();
-  hueCtx.moveTo(hw - 1, hy);
-  hueCtx.lineTo(hw - ax, hy - ax * 0.75);
-  hueCtx.lineTo(hw - ax, hy + ax * 0.75);
+  hueCtx.moveTo(-1, hy - triH / 2);
+  hueCtx.lineTo(triW, hy);
+  hueCtx.lineTo(-1, hy + triH / 2);
   hueCtx.closePath();
+  hueCtx.fillStyle = "rgba(60,60,60,0.85)";
   hueCtx.fill();
-  hueCtx.stroke();
+  hueCtx.restore();
 }
 
 function sbPickFromClient(clientX, clientY) {
@@ -3629,10 +3671,11 @@ function clampDrawColorFloatToViewport() {
   let top = r.top;
   const w = r.width;
   const h = r.height;
-  if (left < pad) left = pad;
+  const GRAB_STRIP = 36;
+  if (left + GRAB_STRIP < pad) left = pad - GRAB_STRIP;
   if (top < pad) top = pad;
-  if (left + w > vw - pad) left = Math.max(pad, vw - pad - w);
-  if (top + h > vh - pad) top = Math.max(pad, vh - pad - h);
+  if (left > vw - GRAB_STRIP) left = vw - GRAB_STRIP;
+  if (top + GRAB_STRIP > vh) top = vh - GRAB_STRIP;
   drawColorFloat.style.left = `${Math.round(left)}px`;
   drawColorFloat.style.top = `${Math.round(top)}px`;
   drawColorFloat.style.right = "auto";
@@ -3646,17 +3689,31 @@ function loadDrawColorFloatPos() {
     if (!raw) return;
     const o = JSON.parse(raw);
     if (typeof o.left !== "number" || typeof o.top !== "number") return;
-    drawColorFloat.style.left = `${Math.round(o.left)}px`;
-    drawColorFloat.style.top = `${Math.round(o.top)}px`;
-    drawColorFloat.style.right = "auto";
-    drawColorFloat.style.bottom = "auto";
-    if (typeof o.width === "number" && typeof o.height === "number") {
+    if (typeof o.width === "number" && typeof o.height === "number" && !o.collapsed) {
       drawColorFloat.style.width = `${Math.round(o.width)}px`;
       drawColorFloat.style.height = `${Math.round(o.height)}px`;
       drawColorFloat.classList.add("draw-color-float--sized");
       scheduleSyncPickerToFloat();
     }
-    clampDrawColorFloatToViewport();
+    if (o.collapsed) {
+      drawColorFloatExpandedRect = {
+        left: o.expandedLeft || o.left,
+        top: o.expandedTop || o.top,
+        width: o.width || 0,
+        height: o.height || 0,
+      };
+      drawColorFloat.style.left = `${Math.round(o.left)}px`;
+      drawColorFloat.style.top = `${Math.round(o.top)}px`;
+      drawColorFloat.style.right = "auto";
+      drawColorFloat.style.bottom = "auto";
+      collapseDrawColorFloat();
+    } else {
+      drawColorFloat.style.left = `${Math.round(o.left)}px`;
+      drawColorFloat.style.top = `${Math.round(o.top)}px`;
+      drawColorFloat.style.right = "auto";
+      drawColorFloat.style.bottom = "auto";
+      clampDrawColorFloatToViewport();
+    }
   } catch (_) {
     /* noop */
   }
@@ -3666,8 +3723,13 @@ function saveDrawColorFloatPos() {
   if (!drawColorFloat) return;
   try {
     const r = drawColorFloat.getBoundingClientRect();
-    const o = { left: r.left, top: r.top };
-    if (drawColorFloat.classList.contains("draw-color-float--sized")) {
+    const o = { left: r.left, top: r.top, collapsed: drawColorFloatCollapsed };
+    if (drawColorFloatCollapsed && drawColorFloatExpandedRect) {
+      o.expandedLeft = drawColorFloatExpandedRect.left;
+      o.expandedTop = drawColorFloatExpandedRect.top;
+      o.width = drawColorFloatExpandedRect.width;
+      o.height = drawColorFloatExpandedRect.height;
+    } else if (drawColorFloat.classList.contains("draw-color-float--sized")) {
       o.width = Math.round(r.width);
       o.height = Math.round(r.height);
     }
@@ -3726,8 +3788,6 @@ function onFloatResizePointerMove(e) {
   }
   width = Math.max(minW, Math.min(maxW, width));
   height = Math.max(minH, Math.min(maxH, height));
-  if (left + width > vw - pad) left = vw - pad - width;
-  if (top + height > vh - pad) top = vh - pad - height;
   drawColorFloat.style.left = `${Math.round(left)}px`;
   drawColorFloat.style.top = `${Math.round(top)}px`;
   drawColorFloat.style.width = `${Math.round(width)}px`;
@@ -3752,6 +3812,52 @@ function onFloatResizePointerUp(e) {
   clampDrawColorFloatToViewport();
   syncPickerToFloatDimensions();
   saveDrawColorFloatPos();
+}
+
+const drawColorFloatToggle = document.getElementById("drawColorFloatToggle");
+let drawColorFloatCollapsed = false;
+let drawColorFloatExpandedRect = null;
+
+function collapseDrawColorFloat() {
+  if (!drawColorFloat) return;
+  const r = drawColorFloat.getBoundingClientRect();
+  drawColorFloatExpandedRect = { left: r.left, top: r.top, width: r.width, height: r.height };
+  drawColorFloatCollapsed = true;
+  drawColorFloat.classList.add("draw-color-float--collapsed");
+  if (drawColorFloatToggle) drawColorFloatToggle.textContent = "+";
+  saveDrawColorFloatPos();
+}
+
+function expandDrawColorFloat() {
+  if (!drawColorFloat) return;
+  drawColorFloatCollapsed = false;
+  drawColorFloat.classList.remove("draw-color-float--collapsed");
+  if (drawColorFloatExpandedRect) {
+    drawColorFloat.style.left = `${Math.round(drawColorFloatExpandedRect.left)}px`;
+    drawColorFloat.style.top = `${Math.round(drawColorFloatExpandedRect.top)}px`;
+    if (drawColorFloat.classList.contains("draw-color-float--sized")) {
+      drawColorFloat.style.width = `${Math.round(drawColorFloatExpandedRect.width)}px`;
+      drawColorFloat.style.height = `${Math.round(drawColorFloatExpandedRect.height)}px`;
+    }
+  }
+  if (drawColorFloatToggle) drawColorFloatToggle.textContent = "\u2212";
+  clampDrawColorFloatToViewport();
+  scheduleSyncPickerToFloat();
+  saveDrawColorFloatPos();
+}
+
+if (drawColorFloatToggle) {
+  drawColorFloatToggle.addEventListener("pointerdown", (e) => {
+    e.stopPropagation();
+  });
+  drawColorFloatToggle.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (drawColorFloatCollapsed) {
+      expandDrawColorFloat();
+    } else {
+      collapseDrawColorFloat();
+    }
+  });
 }
 
 if (drawColorFloatBar && drawColorFloat) {

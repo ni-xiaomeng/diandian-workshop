@@ -221,7 +221,7 @@
               class="draw-color-float__title"
               id="drawColorFloatBar"
               title="拖动标题栏可移动窗口"
-            >取色</div>
+            ><span>取色</span><button type="button" class="draw-color-float__toggle" id="drawColorFloatToggle" title="收起/展开">−</button></div>
             <div class="draw-color-float__body">
               <div class="draw-color-float__sv-wrap">
                 <div class="sv-hue-picker" id="svHuePickerRoot">
@@ -235,10 +235,10 @@
                 <div id="colorPreview" role="img" aria-label="当前颜色预览" title="在上方色谱中选择颜色"></div>
               </div>
             </div>
-            <button type="button" class="draw-color-float__handle" data-corner="nw" aria-label="拖动左上角调整窗口大小" tabindex="0"></button>
-            <button type="button" class="draw-color-float__handle" data-corner="ne" aria-label="拖动右上角调整窗口大小" tabindex="0"></button>
-            <button type="button" class="draw-color-float__handle" data-corner="sw" aria-label="拖动左下角调整窗口大小" tabindex="0"></button>
-            <button type="button" class="draw-color-float__handle" data-corner="se" aria-label="拖动右下角调整窗口大小" tabindex="0"></button>
+            <div class="draw-color-float__handle" data-corner="nw"></div>
+            <div class="draw-color-float__handle" data-corner="ne"></div>
+            <div class="draw-color-float__handle" data-corner="sw"></div>
+            <div class="draw-color-float__handle" data-corner="se"></div>
           </div>
           <div class="color-stats">
             <div class="color-stats__title">颜色统计</div>

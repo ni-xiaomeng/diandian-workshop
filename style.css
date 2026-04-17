@@ -742,7 +742,7 @@ button:hover {
   height: var(--toolbar-control-h);
   min-height: var(--toolbar-control-h);
   flex-shrink: 0;
-  border: 2px dashed #d0d0d2;
+  border: 2px solid #d0d0d2;
   background: var(--paper-mid);
   box-sizing: border-box;
   cursor: pointer;
@@ -940,10 +940,51 @@ button:hover {
   user-select: none;
   touch-action: none;
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .draw-color-float__title:active {
   cursor: grabbing;
+}
+
+.draw-color-float__toggle {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+  font-size: 14px;
+  line-height: 20px;
+  text-align: center;
+  border-radius: 50%;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background 0.15s;
+}
+
+.draw-color-float__toggle:hover {
+  background: rgba(255,255,255,0.3);
+}
+
+.draw-color-float.draw-color-float--collapsed .draw-color-float__body,
+.draw-color-float.draw-color-float--collapsed .draw-color-float__handle {
+  display: none !important;
+}
+
+.draw-color-float.draw-color-float--collapsed {
+  width: auto !important;
+  height: auto !important;
+  max-width: none;
+  max-height: none;
+}
+
+.draw-color-float.draw-color-float--collapsed .draw-color-float__title {
+  border-radius: var(--radius-lg);
 }
 
 .draw-color-float__body {
@@ -994,15 +1035,14 @@ button:hover {
   touch-action: none;
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+  outline: none;
+  color: transparent;
+  font-size: 0;
+  overflow: hidden;
 }
 
-.draw-color-float__handle:focus-visible {
-  opacity: 1;
-  border: 2px solid var(--bit-ink);
-  background: #fff;
-  outline: 2px solid #06c;
-  outline-offset: 1px;
-}
 
 .draw-color-float__handle[data-corner="nw"] { top: -4px; left: -4px; cursor: nwse-resize; }
 .draw-color-float__handle[data-corner="ne"] { top: -4px; right: -4px; cursor: nesw-resize; }

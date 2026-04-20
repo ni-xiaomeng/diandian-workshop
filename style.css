@@ -727,7 +727,6 @@ body {
   color: #333;
   border-bottom-color: #888;
 }
-
 .draw-sidebar .grid-size-input,
 .draw-sidebar .grid-size-x {
   color: var(--bit-ink);
@@ -854,6 +853,7 @@ body {
 .guide-color-native::-webkit-color-swatch {
   border: none;
 }
+
 
 .grid-size-x {
   font-size: 0.6rem;

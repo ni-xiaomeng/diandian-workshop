@@ -551,7 +551,7 @@ function drawGuideLines(ctx, cols, rows, pixelSize, interval, color) {
   const h = rows * pixelSize;
   ctx.save();
   ctx.strokeStyle = color;
-  ctx.lineWidth = Math.max(1, Math.round(pixelSize * 0.12));
+  ctx.lineWidth = Math.max(1, Math.round(pixelSize * 0.08));
   ctx.globalAlpha = 0.55;
   for (let x = interval; x < cols; x += interval) {
     const px = x * pixelSize + 0.5;

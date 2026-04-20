@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=20260423p">
 </head>
 <body>
   <main class="app">
@@ -53,95 +53,77 @@
             tabindex="-1"
             aria-hidden="true"
           />
-          <div class="toolbar toolbar--convert">
-            <div class="toolbar__actions">
-              <div class="toolbar__actions-main">
-                <div
-                  class="source-slot"
-                  id="sourceSlot"
-                  title="点击选择图片，拖拽图片到此处，或 Ctrl+V（Mac：Cmd+V）粘贴"
-                  aria-live="polite"
-                  tabindex="0"
-                >
-                  <div class="source-slot__empty" id="sourceSlotEmpty">导入</div>
-                  <div class="source-slot__inner" id="sourceSlotInner" hidden>
-                    <img id="convertThumbPreview" class="source-slot__img" alt="图源缩略图" />
-                    <div class="source-slot__overlay">
-                      <button type="button" class="source-slot__clear" id="clearImportBtn" aria-label="删除图片">×</button>
-                    </div>
+          <div class="convert-layout">
+            <div class="convert-sidebar">
+              <div
+                class="source-slot source-slot--sidebar convert-sidebar__btn"
+                id="sourceSlot"
+                title="点击选择图片，拖拽图片到此处，或 Ctrl+V（Mac：Cmd+V）粘贴"
+                aria-live="polite"
+                tabindex="0"
+              >
+                <div class="source-slot__empty" id="sourceSlotEmpty">导入</div>
+                <div class="source-slot__inner" id="sourceSlotInner" hidden>
+                  <img id="convertThumbPreview" class="source-slot__img" alt="图源缩略图" />
+                  <div class="source-slot__overlay">
+                    <button type="button" class="source-slot__clear" id="clearImportBtn" aria-label="删除图片">×</button>
                   </div>
                 </div>
               </div>
-              <div class="toolbar__export-group">
-                <button id="exportConvertBtn" type="button" class="btn-toolbar">导出 PNG</button>
-                <button id="sendToDrawBtn" type="button" class="btn-toolbar btn-toolbar--secondary">发送到画板</button>
+              <button id="exportConvertBtn" type="button" class="convert-sidebar__btn">导出</button>
+              <button id="sendToDrawBtn" type="button" class="convert-sidebar__btn">发送到画板</button>
+              <div class="draw-sidebar__divider" aria-hidden="true"></div>
+              <span class="convert-sidebar__caption">像素格</span>
+              <div class="convert-sidebar__size" aria-live="polite">
+                <input id="convertGridCols" type="text" inputmode="numeric" pattern="[0-9]*" value="32" aria-label="宽" class="grid-size-input" maxlength="3" />
+                <span class="grid-size-x">×</span>
+                <input id="convertGridRows" type="text" inputmode="numeric" pattern="[0-9]*" value="32" aria-label="高" class="grid-size-input" maxlength="3" />
               </div>
+              <input id="convertGridColsRange" type="range" min="1" max="200" step="1" value="32" aria-label="宽（滑动）" class="convert-sidebar__range" />
+              <input id="convertGridRowsRange" type="range" min="1" max="200" step="1" value="32" aria-label="高（滑动）" class="convert-sidebar__range" />
+              <label class="check-label check-label--small"><input type="checkbox" id="convertLockAspect" checked /> 锁定比例</label>
+              <label class="check-label check-label--small"><input type="checkbox" id="convertSmartColor" checked /> 智能归色</label>
+              <label class="check-label check-label--small"><input type="checkbox" id="showConvertOriginal" disabled /> 对照原图</label>
+              <div class="draw-sidebar__divider" aria-hidden="true"></div>
+              <div class="convert-sidebar__guide">
+                <label class="check-label check-label--small"><input type="checkbox" id="convertGuideOn" /> 辅助线</label>
+                <div class="convert-sidebar__guide-sub">
+                  <input id="convertGuideInterval" type="text" inputmode="numeric" pattern="[0-9]*" value="5" class="grid-size-input convert-sidebar__guide-interval" title="间隔（2–20）" maxlength="2" />
+                  <div class="convert-sidebar__guide-color-field" title="辅助线颜色">
+                    <span id="convertGuideColorPreview" class="guide-color-preview guide-color-preview--tiny" aria-hidden="true"></span>
+                    <input type="color" id="convertGuideColor" value="#ff0000" class="guide-color-native guide-color-native--tiny" />
+                  </div>
+                </div>
+              </div>
+              <div class="draw-sidebar__divider" aria-hidden="true"></div>
+              <span class="convert-sidebar__caption">颜色提取</span>
+              <input type="range" id="convertColorExtractRange" min="1" max="100" value="50" step="1" aria-label="颜色提取强度" class="convert-sidebar__range" />
+              <div class="convert-sidebar__extract-labels">
+                <span>少</span>
+                <span id="convertColorExtractVal" class="convert-sidebar__extract-val">50</span>
+                <span>多</span>
+              </div>
+              <label class="check-label check-label--small"><input type="checkbox" id="priorityValue" /> 明度优先</label>
+              <label class="check-label check-label--small"><input type="checkbox" id="priorityHue" checked /> 色相优先</label>
             </div>
-            <div class="toolbar__settings">
-              <div class="grid-size-control" role="group" aria-label="像素格数量">
-                <div class="grid-size-control__head grid-size-control__head--convert">
-                  <div class="grid-size-control__head-left">
-                    <span class="grid-size-control__title">像素格数量</span>
-                    <span class="grid-size-control__hint">（1-200）</span>
-                  </div>
-                  <div class="grid-size-control__head-options">
-                    <label class="check-label"><input type="checkbox" id="convertLockAspect" checked /> 与图源比例一致</label>
-                    <label class="check-label"><input type="checkbox" id="convertSmartColor" checked /> 智能归纳颜色</label>
-                    <label class="check-label"><input type="checkbox" id="showConvertOriginal" disabled /> 对照原图</label>
-                  </div>
-                </div>
-                <div class="grid-size-control__pairs">
-                  <div class="grid-size-control__pair">
-                    <input id="convertGridCols" type="number" min="1" max="200" value="32" aria-label="宽" />
-                    <input id="convertGridColsRange" type="range" min="1" max="200" step="1" value="32" aria-label="宽（滑动）" />
-                  </div>
-                  <span class="grid-size-control__x" aria-hidden="true">×</span>
-                  <div class="grid-size-control__pair">
-                    <input id="convertGridRows" type="number" min="1" max="200" value="32" aria-label="高" />
-                    <input id="convertGridRowsRange" type="range" min="1" max="200" step="1" value="32" aria-label="高（滑动）" />
-                  </div>
+            <div class="convert-canvas-area">
+              <div class="canvas-wrap canvas-wrap--convert">
+                <div class="convert-view-stack">
+                  <canvas id="convertCanvas" width="512" height="512"></canvas>
+                  <img
+                    id="convertOriginalView"
+                    class="convert-original-view"
+                    alt=""
+                    decoding="async"
+                    aria-hidden="true"
+                  />
                 </div>
               </div>
-            </div>
-          </div>
-          <div class="canvas-wrap canvas-wrap--convert">
-            <div class="convert-view-stack">
-              <canvas id="convertCanvas" width="512" height="512"></canvas>
-              <img
-                id="convertOriginalView"
-                class="convert-original-view"
-                alt=""
-                decoding="async"
-                aria-hidden="true"
-              />
             </div>
           </div>
           <div class="color-stats">
             <div class="color-stats__title">颜色统计</div>
-            <div class="color-stats__head color-stats__head--convert">
-              <div id="convertColorSummary" class="color-stats__summary">共 0 种颜色</div>
-              <div class="convert-color-extract" role="group" aria-label="颜色提取强度">
-                <label class="convert-color-extract__label" for="convertColorExtractRange">颜色提取</label>
-                <div class="convert-color-extract__row">
-                  <span class="convert-color-extract__end">少</span>
-                  <input
-                    type="range"
-                    id="convertColorExtractRange"
-                    min="1"
-                    max="100"
-                    value="50"
-                    step="1"
-                    aria-label="颜色提取强度"
-                  />
-                  <span class="convert-color-extract__end">多</span>
-                  <span id="convertColorExtractVal" class="convert-color-extract__val">50</span>
-                </div>
-              </div>
-            </div>
-            <div class="color-priority-options" role="group" aria-label="颜色优先级">
-              <label class="check-label"><input type="checkbox" id="priorityValue" /> 明度优先</label>
-              <label class="check-label"><input type="checkbox" id="priorityHue" checked /> 色相优先</label>
-            </div>
+            <div id="convertColorSummary" class="color-stats__summary">共 0 种颜色</div>
             <div id="convertColorSwatches" class="color-stats__swatches"></div>
           </div>
         </div>
@@ -158,7 +140,8 @@
         <div class="mac-window__body">
           <div class="draw-layout">
             <div class="draw-sidebar">
-              <button id="selectBtn" type="button" class="draw-sidebar__btn" title="选择对象，拖拽移动，R旋转，Enter确认，Delete删除">选择</button>
+              <button id="selectBtn" type="button" class="draw-sidebar__btn" title="选择对象，拖拽移动，拽角缩放，Enter确认，Delete删除">选择</button>
+              <button id="rotateObjBtn" type="button" class="draw-sidebar__btn" style="display:none" title="旋转选中对象 45°（快捷键 R）">旋转</button>
               <button id="penBtn" type="button" class="draw-sidebar__btn active" title="画笔">画笔</button>
               <button id="eraserBtn" type="button" class="draw-sidebar__btn" title="橡皮">橡皮</button>
               <button id="eyedropperBtn" type="button" class="draw-sidebar__btn" title="吸色（E / I）">吸色</button>
@@ -181,7 +164,19 @@
               <button id="drawZoomReset" type="button" class="draw-sidebar__btn" title="重置 100%">1:1</button>
               <div class="draw-sidebar__divider"></div>
               <button id="exportDrawBtn" type="button" class="draw-sidebar__btn" title="导出 PNG">导出</button>
-              <span class="draw-sidebar__size" id="drawGridSizeLabel" aria-live="polite">32×32</span>
+              <div class="draw-sidebar__divider"></div>
+              <div class="draw-sidebar__guide">
+                <label class="check-label check-label--small"><input type="checkbox" id="drawGuideOn" /> 辅助线</label>
+                <div class="draw-sidebar__guide-size-row">
+                  <input id="drawGuideInterval" type="text" inputmode="numeric" pattern="[0-9]*" value="5" class="grid-size-input" title="间隔（2–20）" maxlength="2" />
+                  <div class="draw-sidebar__guide-color-field" title="辅助线颜色">
+                    <span id="drawGuideColorPreview" class="guide-color-preview" aria-hidden="true"></span>
+                    <input type="color" id="drawGuideColor" value="#ff0000" class="guide-color-native" />
+                  </div>
+                </div>
+              </div>
+              <div class="draw-sidebar__divider"></div>
+              <div class="draw-sidebar__size" id="drawGridSizeLabel" aria-live="polite"><input id="drawGridColsInput" type="text" inputmode="numeric" pattern="[0-9]*" value="32" class="grid-size-input" title="宽度"><span class="grid-size-x">×</span><input id="drawGridRowsInput" type="text" inputmode="numeric" pattern="[0-9]*" value="32" class="grid-size-input" title="高度"></div>
             </div>
 
             <div class="draw-canvas-area">
@@ -220,7 +215,7 @@
               class="draw-color-float__title"
               id="drawColorFloatBar"
               title="拖动标题栏可移动窗口"
-            >取色</div>
+            ><span>取色</span><button type="button" class="draw-color-float__toggle" id="drawColorFloatToggle" title="收起/展开">−</button></div>
             <div class="draw-color-float__body">
               <div class="draw-color-float__sv-wrap">
                 <div class="sv-hue-picker" id="svHuePickerRoot">
@@ -234,10 +229,10 @@
                 <div id="colorPreview" role="img" aria-label="当前颜色预览" title="在上方色谱中选择颜色"></div>
               </div>
             </div>
-            <button type="button" class="draw-color-float__handle" data-corner="nw" aria-label="拖动左上角调整窗口大小" tabindex="0"></button>
-            <button type="button" class="draw-color-float__handle" data-corner="ne" aria-label="拖动右上角调整窗口大小" tabindex="0"></button>
-            <button type="button" class="draw-color-float__handle" data-corner="sw" aria-label="拖动左下角调整窗口大小" tabindex="0"></button>
-            <button type="button" class="draw-color-float__handle" data-corner="se" aria-label="拖动右下角调整窗口大小" tabindex="0"></button>
+            <div class="draw-color-float__handle" data-corner="nw"></div>
+            <div class="draw-color-float__handle" data-corner="ne"></div>
+            <div class="draw-color-float__handle" data-corner="sw"></div>
+            <div class="draw-color-float__handle" data-corner="se"></div>
           </div>
           <div class="color-stats">
             <div class="color-stats__title">颜色统计</div>
@@ -249,6 +244,6 @@
     </section>
   </main>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=20260423p"></script>
 </body>
 </html>
